@@ -297,18 +297,22 @@ export class LeaderboardService {
     const definition = await this.getDefinition({ leaderboard_id: input.leaderboard_id });
     const dimensions = definition.dimensions as Array<Record<string, unknown>>;
     const expected = new Map(dimensions.map((dimension) => [text(dimension.dimension_id), text(dimension.criteria_version_id)]));
-    if (input.scores.length !== expected.size) throw new Error("Submit exactly one score for every active dimension");
     const seen = new Set<string>();
     for (const score of input.scores) {
       if (seen.has(score.dimension_id)) throw new Error(`Duplicate dimension: ${score.dimension_id}`);
       seen.add(score.dimension_id);
-      if (!expected.has(score.dimension_id)) throw new Error(`Inactive or unknown dimension: ${score.dimension_id}`);
+      if (!expected.has(score.dimension_id)) {
+        throw new Error(`STALE_CRITERIA: ${score.dimension_id} is not active in the current definition; refresh and recalculate all scores`);
+      }
       if (expected.get(score.dimension_id) !== score.criteria_version_id) {
-        throw new Error(`Stale criteria version for ${score.dimension_id}; fetch the definition again`);
+        throw new Error(`STALE_CRITERIA: ${score.dimension_id} must use the current definition; refresh and recalculate all scores`);
       }
       if (!Number.isFinite(score.score) || score.score < 0 || score.score > 100) {
         throw new Error(`Score for ${score.dimension_id} must be between 0 and 100`);
       }
+    }
+    if (input.scores.length !== expected.size) {
+      throw new Error("STALE_CRITERIA: submitted dimensions do not match the current definition; refresh and recalculate all scores");
     }
     const timezone = text(leaderboard.fields.timezone);
     const today = localDate(this.clock.now(), timezone);

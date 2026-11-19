@@ -31,13 +31,15 @@ MCP_ALLOWED_ORIGINS   # 可选，逗号分隔
 | `create_leaderboard` | 创建排行榜并装入已确认的三个默认维度 |
 | `join_leaderboard` | 加入或重新加入 |
 | `leave_leaderboard` | 离开；历史分数仍保留 |
-| `get_leaderboard_definition` | 获取当前周期维度和必须使用的规则版本 |
+| `get_leaderboard_definition` | 加入时或跨周期/stale 后获取当前周期维度和必须使用的规则版本 |
 | `add_dimension` | 创建者新增维度；MVP 不支持删除，下一周期生效 |
 | `update_scoring_criteria` | 创建者用一段自然语言发布新版规则；下一周期生效 |
 | `submit_daily_update` | 提交当前所有维度的分数和规则版本 |
 | `get_leaderboard` | 读当前日榜或周榜 |
 
 `submit_daily_update` 不接受客户端日期或时区。服务端按排行榜唯一的 IANA 时区决定当天；同一天再次提交会覆盖当天最终快照。`idempotency_key` 相同且内容相同视为安全重试，相同 key 配不同内容会被拒绝。
+
+参与者 Agent 应在加入排行榜时获取一次 definition，并在本地按排行榜缓存 `current_cycle_start`、`next_cycle_start`、维度、标准和版本。同一周期内复用缓存；每次餐食或训练打卡可以即时更新本地分数，但不要重复取规则。到 `next_cycle_start` 后，在新周期首次提交前刷新。如果提交返回 `STALE_CRITERIA`，刷新 definition、重算全部分数，并用新幂等键重提一次。没有任何 active membership 时，只按已确认默认规则本地评分，不调用 MCP、不上传分数。
 
 周榜是本周每天最终分数的累计，不是平均分。评分规则由 Agent 执行，MCP 不根据热量、体重、步数等原始指标自行算分。
 

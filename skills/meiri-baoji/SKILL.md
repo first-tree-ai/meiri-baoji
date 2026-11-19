@@ -24,7 +24,9 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 
 先读 `baoji/playbook.md` 和 `baoji/profile.md`（如果存在），以它们为准，因为里面有用户的偏好。用户提了新偏好，马上写进去。
 
-用户明确同意加入排行榜后，按 `baoji/leaderboard.md` 工作。每次打分前先从 MCP 取当前规则；不把本地旧副本当成最新版。原始健康数据仍留在 `baoji/`，只上传分数和必要标识。
+评分不依赖排行榜：用户没有加入任何排行榜时，按 `baoji/scoring.md` 的已确认默认规则在本地计算饮食分、运动分和薄肌分，不调用排行榜 MCP，也不上传分数。
+
+用户明确同意加入排行榜后，按 `baoji/leaderboard.md` 工作，并把 membership 和 definition cache 写入本地 `baoji/leaderboard-state.json`。加入时获取一次 definition；同一 `current_cycle_start` 周期内复用缓存，餐食或训练打卡时直接按缓存标准更新本地分数，不重复拉取。到 `next_cycle_start` 后，在新周期首次提交前刷新；如果 `submit_daily_update` 返回 `STALE_CRITERIA`，刷新后重算再提交。原始健康数据仍留在 `baoji/`，只上传分数和必要标识。
 
 ## 只服务这位用户
 
@@ -41,6 +43,7 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 | `baoji/operations.md` | 想了解整体怎么工作时 |
 | `baoji/scoring.md` | 用户要用评分时 |
 | `baoji/leaderboard.md` | 用户明确同意加入排行榜、打分或看榜时 |
+| `baoji/leaderboard-state.json` | 有排行榜 membership 时，保存本地 membership 与按周期缓存的 definition；没有时不创建也不调用 MCP |
 | `baoji/goal-interview.md` | 访谈没做完时 |
 | `baoji/reminders.md` | 开启、修改提醒时 |
 | `baoji/apple-health.md` | 用户想接入苹果健康时 |

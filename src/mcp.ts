@@ -54,7 +54,7 @@ export function buildServer(service = new LeaderboardService(new EnvLarkBaseStor
   server.registerTool(
     "get_leaderboard_definition",
     {
-      description: "Get active dimensions and the exact criteria version to use for the current cycle.",
+      description: "Get active dimensions and exact criteria versions for the current cycle. Cache this definition until next_cycle_start; do not fetch it before every score.",
       inputSchema: z.object({ leaderboard_id: z.string() })
     },
     (input) => toolResult(() => service.getDefinition(input))
@@ -93,7 +93,7 @@ export function buildServer(service = new LeaderboardService(new EnvLarkBaseStor
   server.registerTool(
     "submit_daily_update",
     {
-      description: "Submit all current 0-100 dimension scores. The server chooses the date from the leaderboard timezone; a later submission replaces that day's final snapshot.",
+      description: "Submit all current 0-100 dimension scores. The server chooses the date from the leaderboard timezone; a later submission replaces that day's final snapshot. STALE_CRITERIA means refresh the definition and recalculate.",
       inputSchema: z.object({
         leaderboard_id: z.string(),
         member_subject: z.string(),

@@ -38,7 +38,7 @@
 ## 评分与排行榜（可选）
 
 - 分数是看趋势和轻量互动的工具，不是评价。用户明确同意后才用。
-- 排行榜默认饮食分、运动分、薄肌分；规则见 `scoring.md` 和 `leaderboard.md`。每次以 MCP 返回的当前版本为准。
+- 排行榜默认饮食分、运动分、薄肌分；规则见 `scoring.md` 和 `leaderboard.md`。没有 membership 时仍按默认规则在本地评分，但不调用 MCP、不上传分数；有 membership 时复用当前周期缓存的 definition，只在跨周期或 stale 时刷新。
 - 资料不足时先追问；仍不足就记“未知”，不按零分处理，也不提交当天分数。
 - 原始饮食、训练、体重、照片和健康数据不上传 MCP；只上传必要标识、0–100 分、规则版本和幂等键。
 - 出现进食障碍迹象时停用评分，也不再推减脂目标。
@@ -51,7 +51,7 @@
 
 ## 数据
 
-- 本地数据都在 `baoji/`：`profile.md`（目标和身体数据）、`log/YYYY-MM-DD.md`（当天记录）、`training.csv`（训练）、`scoring.md`、`leaderboard.md`、`reminders.md`。
+- 本地数据都在 `baoji/`：`profile.md`（目标和身体数据）、`log/YYYY-MM-DD.md`（当天记录）、`training.csv`（训练）、`scoring.md`、`leaderboard.md`、`leaderboard-state.json`（可选的 membership 和按周期 definition cache）、`reminders.md`。
 - 原始私人图片默认不另存，只存必要的文字摘要。
 - 用户可随时查看、更正、导出、清空。
 - 数据来源（如苹果健康）要用户明确授权后才接入，没有真正连接和验证之前不声称能读取。

@@ -140,12 +140,46 @@ test("submissions require all active dimensions and current criteria versions", 
   const { service, leaderboardId, definition } = await setup();
   await assert.rejects(
     () => service.submitDailyUpdate({ leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "partial", scores: scores(definition).slice(0, 2) }),
-    /exactly one score/
+    /STALE_CRITERIA: submitted dimensions do not match the current definition/
   );
   const stale = scores(definition);
   stale[0].criteria_version_id = "stale";
   await assert.rejects(
     () => service.submitDailyUpdate({ leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "stale", scores: stale }),
-    /Stale criteria version/
+    /^Error: STALE_CRITERIA: diet must use the current definition; refresh and recalculate all scores$/
   );
+});
+
+test("a cached definition becomes stale at the cycle boundary and succeeds after refresh", async () => {
+  const { service, clock, leaderboardId, definition: cachedDefinition } = await setup();
+  assert.equal(cachedDefinition.current_cycle_start, "2026-11-16");
+  assert.equal(cachedDefinition.next_cycle_start, "2026-11-23");
+  await service.updateCriteria({
+    leaderboard_id: leaderboardId,
+    actor_subject: "creator",
+    dimension_id: "diet",
+    criteria_text: "新周期饮食标准"
+  });
+  clock.set("2026-11-23T01:00:00Z");
+
+  await assert.rejects(
+    () => service.submitDailyUpdate({
+      leaderboard_id: leaderboardId,
+      member_subject: "alice",
+      idempotency_key: "cached-old-cycle",
+      scores: scores(cachedDefinition)
+    }),
+    /STALE_CRITERIA: diet must use the current definition/
+  );
+
+  const refreshed = await service.getDefinition({ leaderboard_id: leaderboardId });
+  assert.equal(refreshed.current_cycle_start, "2026-11-23");
+  assert.equal(refreshed.next_cycle_start, "2026-11-30");
+  const accepted = await service.submitDailyUpdate({
+    leaderboard_id: leaderboardId,
+    member_subject: "alice",
+    idempotency_key: "refreshed-new-cycle",
+    scores: scores(refreshed)
+  });
+  assert.equal(accepted.local_date, "2026-11-23");
 });
