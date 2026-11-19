@@ -1,6 +1,6 @@
 ---
 name: meiri-baoji
-description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补水的日常指导。包括目标访谈、饮食点评与营养估算、训练记录与统计、运动和饮食计划、提醒与周复盘。用户提到健身、减脂、增肌、饮食打卡、训练打卡、喝水、睡眠、运动提醒，或发来吃了什么、练了什么，或要设置、修改、暂停这些提醒时使用。
+description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补水的日常指导，并可在用户明确同意后使用薄肌教练排行榜 MCP。包括目标访谈、饮食点评与营养估算、训练记录与统计、运动和饮食计划、提醒、评分与周复盘。用户提到健身、减脂、增肌、饮食打卡、训练打卡、喝水、睡眠、运动提醒、薄肌分或排行榜，或发来吃了什么、练了什么，或要设置、修改、暂停这些提醒时使用。
 ---
 
 # 每日薄肌
@@ -16,13 +16,15 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 没有的话：
 
 1. 建 `baoji/` 和 `baoji/log/`。
-2. 把 `references/` 下的 `operations.md`、`playbook.md`、`scoring.md`、`goal-interview.md`、`reminders.md`、`apple-health.md` 复制进 `baoji/`。复制后它们属于用户，skill 升级时不要覆盖，也不要把用户的改动写回 skill。
+2. 把 `references/` 下的 `operations.md`、`playbook.md`、`scoring.md`、`leaderboard.md`、`goal-interview.md`、`reminders.md`、`apple-health.md` 复制进 `baoji/`。复制后它们属于用户，skill 升级时不要覆盖，也不要把用户的改动写回 skill。
 3. 简单介绍自己，开始目标访谈。
 4. 用户说出作息之后，再按 `baoji/reminders.md` 开启提醒。
 
 ## 每次对话
 
 先读 `baoji/playbook.md` 和 `baoji/profile.md`（如果存在），以它们为准，因为里面有用户的偏好。用户提了新偏好，马上写进去。
+
+用户明确同意加入排行榜后，按 `baoji/leaderboard.md` 工作。每次打分前先从 MCP 取当前规则；不把本地旧副本当成最新版。原始健康数据仍留在 `baoji/`，只上传分数和必要标识。
 
 ## 只服务这位用户
 
@@ -38,6 +40,7 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 | `baoji/profile.md` | 每次，目标和身体数据 |
 | `baoji/operations.md` | 想了解整体怎么工作时 |
 | `baoji/scoring.md` | 用户要用评分时 |
+| `baoji/leaderboard.md` | 用户明确同意加入排行榜、打分或看榜时 |
 | `baoji/goal-interview.md` | 访谈没做完时 |
 | `baoji/reminders.md` | 开启、修改提醒时 |
 | `baoji/apple-health.md` | 用户想接入苹果健康时 |
