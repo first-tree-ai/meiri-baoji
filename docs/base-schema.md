@@ -2,6 +2,8 @@
 
 Base 名称：`薄肌教练排行榜`。Base 自身时区设为 `Asia/Shanghai`，每个排行榜仍在 `Leaderboards.timezone` 保存自己的唯一 IANA 时区，所有归档和周周期以该字段为准。
 
+当前 Base：`https://unispark.feishu.cn/base/OPcmbsYWraHusTsGRbMcvF3unNh`。它由当前 Agent 的 bot 身份创建，并已向当前 CLI 用户授予 `full_access`。默认排行榜 ID 是 `thin-muscle-default`。
+
 ## Leaderboards
 
 `leaderboard_id`、`name`、`timezone`、`cycle_anchor_date`、`status`、`creator_subject`、`created_at`、`updated_at`。

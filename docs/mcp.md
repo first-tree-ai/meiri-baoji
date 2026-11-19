@@ -10,6 +10,8 @@
 https://<your-project>.vercel.app/api/mcp
 ```
 
+当前生产地址是 `https://meiri-baoji-leaderboard.vercel.app/api/mcp`。默认排行榜 ID 是 `thin-muscle-default`。
+
 请求必须带 `Authorization: Bearer <MCP_BEARER_TOKEN>`。令牌只放在客户端安全配置或秘密管理器，不写进仓库、群聊或日志。
 
 服务端还需要：
@@ -66,6 +68,6 @@ npm run build
 vercel --prod
 ```
 
-不要把 Vercel token 或飞书 App Secret 放在命令历史、仓库文件或聊天消息里。部署后先访问 `/api/health`；只有返回 `ready` 才表示四项必要配置都已装入。随后用 MCP 客户端完成 initialize、tools/list 和一次只读调用。
+不要把 Vercel token 或飞书 App Secret 放在命令历史、仓库文件或聊天消息里。部署后先访问 `/api/health`；只有返回 `ready` 才表示四项必要配置都已装入。随后用 MCP 客户端完成 initialize、tools/list 和一次只读调用。若项目启用了 Vercel Deployment Protection，还需要在 Vercel 侧为正式 MCP 客户端放行，不能把保护绕过令牌写进仓库或群聊。
 
 当前 MVP 使用静态 Bearer token。Base 已预留 `OAuthRecords`，可存 DCR client、authorization code、access/refresh token 的哈希或加密引用；正式多租户开放前应切换为标准 OAuth，并且绝不在 Base 保存明文令牌。
