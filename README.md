@@ -1,6 +1,6 @@
 # 每日薄肌
 
-一个 [openTag](https://github.com/first-tree-ai/opentag) local Agent skill，让你的 Agent 成为你的私人薄肌助手：目标访谈、饮食打卡和打分、训练记录、每天变着花样的提醒。
+一个 [openTag](https://github.com/first-tree-ai/opentag) local Agent skill，让每个人自己的 personal agent 在饮食、运动、睡眠和补水上给你日常指导：目标访谈、饮食点评和营养估算、训练记录、运动和饮食计划、提醒与周复盘。整体怎么工作见 [运营方式](skills/meiri-baoji/references/operations.md)。
 
 每人用自己的 Agent 和自己的电脑，健康数据只存在你的 Agent 工作目录的 `baoji/` 下。这个仓库里没有任何人的数据，也不要提交。
 
