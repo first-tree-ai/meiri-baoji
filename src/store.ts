@@ -122,3 +122,24 @@ export class LarkBaseStore implements RecordStore {
     }
   }
 }
+
+export class EnvLarkBaseStore implements RecordStore {
+  private inner?: LarkBaseStore;
+
+  private store(): LarkBaseStore {
+    this.inner ||= LarkBaseStore.fromEnv();
+    return this.inner;
+  }
+
+  list(table: TableName): Promise<StoredRecord[]> {
+    return this.store().list(table);
+  }
+
+  create(table: TableName, fields: Record<string, unknown>): Promise<StoredRecord> {
+    return this.store().create(table, fields);
+  }
+
+  update(table: TableName, recordId: string, fields: Record<string, unknown>): Promise<StoredRecord> {
+    return this.store().update(table, recordId, fields);
+  }
+}

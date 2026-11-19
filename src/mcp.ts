@@ -2,7 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { LeaderboardService } from "./service.js";
-import { LarkBaseStore } from "./store.js";
+import { EnvLarkBaseStore } from "./store.js";
 
 function jsonResult(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -17,7 +17,7 @@ function toolResult(action: () => Promise<unknown>) {
     }));
 }
 
-export function buildServer(service = new LeaderboardService(LarkBaseStore.fromEnv())): McpServer {
+export function buildServer(service = new LeaderboardService(new EnvLarkBaseStore())): McpServer {
   const server = new McpServer({ name: "meiri-baoji-leaderboard", version: "0.1.0" });
 
   server.registerTool(
