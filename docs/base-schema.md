@@ -26,8 +26,10 @@ Base 名称：`薄肌教练排行榜`。Base 自身时区设为 `Asia/Shanghai`�
 
 ## DailyScores
 
-`score_snapshot_id`、`leaderboard_id`、`member_subject`、`local_date`、`dimension_id`、`score`、`criteria_version_id`、`idempotency_key`、`submission_hash`、`submitted_at`、`updated_at`。
+`submission_id`、`leaderboard_id`、`member_subject`、`local_date`、`scores_json`、`idempotency_key`、`submission_hash`、`submitted_at`。
 
-逻辑唯一键是 `(leaderboard_id, member_subject, local_date, dimension_id)`。同日重复提交更新同一行，使日榜和周榜始终使用当天最终分数。
+只追加：每次提交写**一行**，`scores_json` 里是当次全部维度（`[{dimension_id, score, criteria_version_id}]`），所以一次提交要么整份写入、要么没写，不会出现部分维度。`submission_id` = `leaderboard_id:member_subject:local_date:idempotency_key`，只用于人工查看。
+
+Base 没有唯一约束，多个实例并发提交可能让同一人同一天有多行。读取时每个 `(member_subject, local_date)` 只取一行作为最终快照：`submitted_at` 最大者，相同再比 `idempotency_key`、记录 ID，所有实例结果一致，不会重复累计。当天已处理过的幂等键都保留：同 key 同内容的重放视为成功且不改变最终快照，同 key 不同内容被拒绝。
 
 `member_subject` 是服务端从 openTag 访问令牌得到的身份（`agent:<openTag 给本 MCP 的 Agent ID>`），不来自工具参数，也不会出现在排行榜返回结果里。鉴权不需要表。

@@ -45,6 +45,45 @@ function fingerprint(scores: ScoreInput[]): string {
   return createHash("sha256").update(JSON.stringify(stable)).digest("hex");
 }
 
+interface FinalSnapshot {
+  member: string;
+  date: string;
+  scores: Map<string, number>;
+}
+
+/**
+ * The final snapshot of each (member, date): the record with the latest `submitted_at`, ties broken by
+ * idempotency key and then record ID, so every reader on every instance picks the same one. Duplicate
+ * records from concurrent writers or retries therefore never add up.
+ */
+export function finalSnapshots(rows: StoredRecord[], leaderboardId: string): FinalSnapshot[] {
+  const latest = new Map<string, StoredRecord>();
+  const order = (record: StoredRecord) =>
+    [text(record.fields.submitted_at), text(record.fields.idempotency_key), record.recordId] as const;
+  for (const record of rows) {
+    if (text(record.fields.leaderboard_id) !== leaderboardId) continue;
+    const key = `${text(record.fields.member_subject)}\u0000${text(record.fields.local_date).slice(0, 10)}`;
+    const current = latest.get(key);
+    if (!current) {
+      latest.set(key, record);
+      continue;
+    }
+    const [a, b] = [order(record), order(current)];
+    if (a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] > b[2])))) latest.set(key, record);
+  }
+  return [...latest.values()].map((record) => {
+    const scores = new Map<string, number>();
+    try {
+      for (const item of JSON.parse(text(record.fields.scores_json)) as Array<{ dimension_id: string; score: number }>) {
+        scores.set(item.dimension_id, number(item.score));
+      }
+    } catch {
+      // An unreadable record contributes nothing rather than failing the whole ranking.
+    }
+    return { member: text(record.fields.member_subject), date: text(record.fields.local_date).slice(0, 10), scores };
+  });
+}
+
 export class LeaderboardService {
   constructor(
     private readonly store: RecordStore,
@@ -316,14 +355,15 @@ export class LeaderboardService {
     }
     const timezone = text(leaderboard.fields.timezone);
     const today = localDate(this.clock.now(), timezone);
-    const allScores = await this.store.list(TABLES.dailyScores);
-    const todayRows = allScores.filter(
+    const todayRows = (await this.store.list(TABLES.dailyScores)).filter(
       (record) =>
         text(record.fields.leaderboard_id) === input.leaderboard_id &&
         text(record.fields.member_subject) === input.member_subject &&
         text(record.fields.local_date).slice(0, 10) === today
     );
     const hash = fingerprint(input.scores);
+    // Submissions are append-only, so every key processed today stays visible: a replay of an older
+    // submission is a no-op instead of overwriting a newer final snapshot.
     const sameKey = todayRows.filter((record) => text(record.fields.idempotency_key) === idempotencyKey);
     if (sameKey.length) {
       if (sameKey.every((record) => text(record.fields.submission_hash) === hash)) {
@@ -332,23 +372,23 @@ export class LeaderboardService {
       throw new Error("idempotency_key was already used with different scores");
     }
     const submittedAt = this.clock.now().toISOString();
-    for (const score of input.scores) {
-      const existing = todayRows.find((record) => text(record.fields.dimension_id) === score.dimension_id);
-      const fields = {
-        score_snapshot_id: `${input.leaderboard_id}:${input.member_subject}:${today}:${score.dimension_id}`,
-        leaderboard_id: input.leaderboard_id,
-        member_subject: input.member_subject,
-        local_date: `${today} 00:00:00`,
-        dimension_id: score.dimension_id,
-        score: score.score,
-        criteria_version_id: score.criteria_version_id,
-        idempotency_key: idempotencyKey,
-        submission_hash: hash,
-        submitted_at: submittedAt
-      };
-      if (existing) await this.store.update(TABLES.dailyScores, existing.recordId, fields);
-      else await this.store.create(TABLES.dailyScores, fields);
-    }
+    // One record holds the whole snapshot, so a submission is written completely or not at all. Concurrent
+    // submissions from several instances each append a record; readers pick one final record per day
+    // (see finalSnapshots), so nothing is double counted and no unique constraint is needed.
+    await this.store.create(TABLES.dailyScores, {
+      submission_id: `${input.leaderboard_id}:${input.member_subject}:${today}:${idempotencyKey}`,
+      leaderboard_id: input.leaderboard_id,
+      member_subject: input.member_subject,
+      local_date: `${today} 00:00:00`,
+      scores_json: JSON.stringify(
+        [...input.scores]
+          .sort((x, y) => x.dimension_id.localeCompare(y.dimension_id))
+          .map(({ dimension_id, score, criteria_version_id }) => ({ dimension_id, score, criteria_version_id }))
+      ),
+      idempotency_key: idempotencyKey,
+      submission_hash: hash,
+      submitted_at: submittedAt
+    });
     return { local_date: today, idempotent: false, overwritten: todayRows.length > 0, submitted_at: submittedAt };
   }
 
@@ -367,15 +407,11 @@ export class LeaderboardService {
       this.store.list(TABLES.members)
     ]);
     const totals = new Map<string, number>();
-    for (const record of rows) {
-      const date = text(record.fields.local_date).slice(0, 10);
-      if (
-        text(record.fields.leaderboard_id) !== input.leaderboard_id ||
-        text(record.fields.dimension_id) !== dimensionId ||
-        (input.period === "day" ? date !== today : !inCycle(date, weekStart))
-      ) continue;
-      const subject = text(record.fields.member_subject);
-      totals.set(subject, (totals.get(subject) || 0) + number(record.fields.score));
+    for (const snapshot of finalSnapshots(rows, input.leaderboard_id)) {
+      if (input.period === "day" ? snapshot.date !== today : !inCycle(snapshot.date, weekStart)) continue;
+      const score = snapshot.scores.get(dimensionId);
+      if (score === undefined) continue;
+      totals.set(snapshot.member, (totals.get(snapshot.member) || 0) + score);
     }
     const names = new Map(
       members

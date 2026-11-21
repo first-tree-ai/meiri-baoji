@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { LeaderboardService } from "../src/service.js";
 import { MemoryStore } from "../src/store.js";
-import type { Clock, ScoreInput } from "../src/types.js";
+import { TABLES, type Clock, type ScoreInput } from "../src/types.js";
 
 class FakeClock implements Clock {
   constructor(private value: Date) {}
@@ -185,4 +185,99 @@ test("a cached definition becomes stale at the cycle boundary and succeeds after
     scores: scores(refreshed)
   });
   assert.equal(accepted.local_date, "2026-11-23");
+});
+
+/** Shares one MemoryStore and can fail the next create or hold every list until N callers are waiting. */
+class ControlledStore extends MemoryStore {
+  failNextCreate = false;
+  private barrier?: { size: number; waiting: Array<() => void> };
+
+  holdLists(size: number): void {
+    this.barrier = { size, waiting: [] };
+  }
+
+  override async list(table: Parameters<MemoryStore["list"]>[0]) {
+    const barrier = this.barrier;
+    if (barrier && table === "DailyScores") {
+      await new Promise<void>((resolve) => {
+        barrier.waiting.push(resolve);
+        if (barrier.waiting.length >= barrier.size) {
+          this.barrier = undefined;
+          barrier.waiting.forEach((release) => release());
+        }
+      });
+    }
+    return super.list(table);
+  }
+
+  override async create(table: Parameters<MemoryStore["create"]>[0], fields: Record<string, unknown>) {
+    if (this.failNextCreate && table === "DailyScores") {
+      this.failNextCreate = false;
+      throw new Error("simulated Base failure");
+    }
+    return super.create(table, fields);
+  }
+}
+
+async function setupControlled() {
+  const store = new ControlledStore();
+  const clock = new FakeClock(new Date("2026-11-19T15:30:00Z"));
+  const service = new LeaderboardService(store, clock);
+  const definition = await service.createLeaderboard({ name: "榜", timezone: "Asia/Shanghai", creator_subject: "creator" });
+  const leaderboardId = String(definition.leaderboard_id);
+  await service.join({ leaderboard_id: leaderboardId, member_subject: "alice", display_name: "Alice" });
+  const dayScore = async () =>
+    ((await service.getLeaderboard({ leaderboard_id: leaderboardId, period: "day" })).entries as Array<Record<string, unknown>>)[0]?.score;
+  return { store, clock, service, definition, leaderboardId, dayScore };
+}
+
+test("a failed write leaves the previous snapshot whole and a same-key retry completes the new one", async () => {
+  const { store, service, definition, leaderboardId, dayScore } = await setupControlled();
+  await service.submitDailyUpdate({ leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "a", scores: scores(definition, [80, 70, 75]) });
+  store.failNextCreate = true;
+  await assert.rejects(
+    () => service.submitDailyUpdate({ leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "b", scores: scores(definition, [90, 80, 85]) }),
+    /simulated Base failure/
+  );
+  assert.equal(await dayScore(), 75);
+  const diet = ((await service.getLeaderboard({ leaderboard_id: leaderboardId, period: "day", dimension_id: "diet" })).entries as Array<Record<string, unknown>>)[0].score;
+  assert.equal(diet, 80, "no dimension of the failed submission was written");
+  const retry = await service.submitDailyUpdate({ leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "b", scores: scores(definition, [90, 80, 85]) });
+  assert.equal(retry.idempotent, false);
+  assert.equal(await dayScore(), 85);
+});
+
+test("concurrent first submissions from separate instances never double count a day", async () => {
+  const { store, service, definition, leaderboardId, dayScore } = await setupControlled();
+  store.holdLists(2);
+  await Promise.all([
+    service.submitDailyUpdate({ leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "x", scores: scores(definition, [80, 70, 75]) }),
+    service.submitDailyUpdate({ leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "y", scores: scores(definition, [80, 70, 75]) })
+  ]);
+  assert.equal((await store.list(TABLES.dailyScores)).length, 2, "both writers appended");
+  assert.equal(await dayScore(), 75, "the ranking uses one final snapshot");
+  const week = ((await service.getLeaderboard({ leaderboard_id: leaderboardId, period: "week" })).entries as Array<Record<string, unknown>>)[0].score;
+  assert.equal(week, 75);
+});
+
+test("concurrent same-key retries count once and later retries stay idempotent", async () => {
+  const { store, service, definition, leaderboardId, dayScore } = await setupControlled();
+  store.holdLists(2);
+  const input = { leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "same", scores: scores(definition, [80, 70, 75]) };
+  await Promise.all([service.submitDailyUpdate(input), service.submitDailyUpdate(input)]);
+  assert.equal(await dayScore(), 75);
+  assert.equal((await service.submitDailyUpdate(input)).idempotent, true);
+});
+
+test("a replay of an older submission never overwrites a newer final snapshot", async () => {
+  const { clock, service, definition, leaderboardId, dayScore } = await setupControlled();
+  const a = { leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "A", scores: scores(definition, [80, 70, 75]) };
+  await service.submitDailyUpdate(a);
+  clock.set("2026-11-19T15:31:00Z");
+  await service.submitDailyUpdate({ leaderboard_id: leaderboardId, member_subject: "alice", idempotency_key: "B", scores: scores(definition, [90, 80, 85]) });
+  clock.set("2026-11-19T15:32:00Z");
+  const replay = await service.submitDailyUpdate(a);
+  assert.equal(replay.idempotent, true);
+  assert.equal(await dayScore(), 85);
+  await assert.rejects(() => service.submitDailyUpdate({ ...a, scores: scores(definition, [1, 2, 3]) }), /already used with different scores/);
 });
