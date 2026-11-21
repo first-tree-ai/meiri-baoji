@@ -30,6 +30,4 @@ Base 名称：`薄肌教练排行榜`。Base 自身时区设为 `Asia/Shanghai`�
 
 逻辑唯一键是 `(leaderboard_id, member_subject, local_date, dimension_id)`。同日重复提交更新同一行，使日榜和周榜始终使用当天最终分数。
 
-`member_subject` 是服务端从 OAuth 访问令牌得到的身份（`opentag:<openTag 给本应用的用户 ID>`），不来自工具参数，也不会出现在排行榜返回结果里。
-
-OAuth 不需要表：客户端、授权码和令牌都由服务端用 `MCP_OAUTH_SECRET` 加密封装，不落库。
+`member_subject` 是服务端从 openTag 访问令牌得到的身份（`agent:<openTag 给本 MCP 的 Agent ID>`），不来自工具参数，也不会出现在排行榜返回结果里。鉴权不需要表。
