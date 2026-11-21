@@ -3,8 +3,7 @@ export const TABLES = {
   dimensions: "Dimensions",
   criteriaVersions: "CriteriaVersions",
   members: "Members",
-  dailyScores: "DailyScores",
-  oauthRecords: "OAuthRecords"
+  dailyScores: "DailyScores"
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

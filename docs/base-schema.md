@@ -2,7 +2,7 @@
 
 Base 名称：`薄肌教练排行榜`。Base 自身时区设为 `Asia/Shanghai`，每个排行榜仍在 `Leaderboards.timezone` 保存自己的唯一 IANA 时区，所有归档和周周期以该字段为准。
 
-当前 Base：`https://unispark.feishu.cn/base/OPcmbsYWraHusTsGRbMcvF3unNh`。它由当前 Agent 的 bot 身份创建，并已向当前 CLI 用户授予 `full_access`。默认排行榜 ID 是 `thin-muscle-default`。
+当前 Base：`https://unispark.feishu.cn/base/OzoibyVbga3xXQsthFrcLBuwnkd`，由 engtag 的 bot 身份创建。MCP 通过一个专用的读写飞书应用访问它，该应用以可编辑文档应用的身份加入 Base。默认排行榜 ID 是 `thin-muscle-default`（已预置 3 个默认维度和 v1 标准）。
 
 ## Leaderboards
 
@@ -30,8 +30,6 @@ Base 名称：`薄肌教练排行榜`。Base 自身时区设为 `Asia/Shanghai`�
 
 逻辑唯一键是 `(leaderboard_id, member_subject, local_date, dimension_id)`。同日重复提交更新同一行，使日榜和周榜始终使用当天最终分数。
 
-## OAuthRecords
+`member_subject` 是服务端从 OAuth 访问令牌得到的身份（`opentag:<openTag 给本应用的用户 ID>`），不来自工具参数，也不会出现在排行榜返回结果里。
 
-`oauth_record_id`、`record_type`、`client_id`、`client_name`、`redirect_uris_json`、`grant_types_json`、`response_types_json`、`token_endpoint_auth_method`、`secret_hash`、`subject`、`scopes`、`redirect_uri`、`expires_at`、`used_at`、`status`、`metadata_json`、`created_at`、`updated_at`。
-
-`record_type` 可取 `dcr_client`、`authorization_code`、`access_token`、`refresh_token`。只保存不可逆哈希、密文或外部秘密引用，不保存明文 client secret、authorization code 或 token。
+OAuth 不需要表：客户端、授权码和令牌都由服务端用 `MCP_OAUTH_SECRET` 加密封装，不落库。
