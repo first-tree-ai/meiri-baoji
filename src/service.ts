@@ -388,7 +388,8 @@ export class LeaderboardService {
     const entries = sorted.map(([subject, score], index) => {
       if (score !== lastScore) lastRank = index + 1;
       lastScore = score;
-      return { rank: lastRank, member_subject: subject, display_name: names.get(subject) || subject, score };
+      // member_subject is the caller-chosen identity used for writes; never return it to other readers.
+      return { rank: lastRank, display_name: names.get(subject) || "成员", score };
     });
     return {
       leaderboard_id: input.leaderboard_id,

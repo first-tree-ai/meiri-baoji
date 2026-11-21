@@ -4,9 +4,13 @@
 
 ## 加入与本地缓存
 
+- `leaderboard_id`：用户给了排行榜 ID 或邀请里带了 ID 就用它；否则用默认排行榜 `thin-muscle-default`。
+- `member_subject`：第一次加入时生成一个随机 UUID，写进 `leaderboard-state.json`，之后这位用户的所有调用（加入、提交、离开、作为创建者修改规则）都用它。不要用真名、手机号、IM 账号 ID 或 Agent ID。它相当于这位用户在排行榜上的身份，不告诉别人。
+- `display_name`：问用户想在榜上显示什么昵称，不默认用真名。
+
 用户同意加入后，调用 `join_leaderboard`，再调用一次 `get_leaderboard_definition`。把 membership 和完整 definition 写入本地 `baoji/leaderboard-state.json`，至少保存：
 
-- `leaderboard_id`、`membership_id` 和 membership `status`；
+- `leaderboard_id`、`member_subject`、`display_name`、`membership_id` 和 membership `status`；
 - definition 的 `timezone`、`current_cycle_start`、`next_cycle_start`、全部维度、自然语言标准和 `criteria_version_id`；
 - `cached_at`，只用于排查缓存，不作为服务端归档时间。
 
@@ -17,7 +21,7 @@
 1. 每次餐食或训练打卡，依据本地记录和缓存标准即时更新当天的 0–100 分，不调用 MCP。MCP 负责分发规则和存分，不替你计算热量、步数、体重变化等原始健康指标。
 2. 资料不足时先问用户。仍不足就不猜、不把未知记成 0，也不要提交当天分数。
 3. 在同一周期提交时，使用缓存中的全部维度和 `criteria_version_id`。到缓存的 `next_cycle_start` 后，先调用一次 `get_leaderboard_definition` 刷新缓存，再进行新周期首次提交。
-4. 用 `submit_daily_update` 一次提交当前全部维度，并生成一个不会重复的 `idempotency_key`。不传日期或时区；服务端按排行榜唯一时区归档，当天再次提交会覆盖当天最终分数。
+4. 用 `submit_daily_update` 一次提交当前全部维度。每份新分数生成一个新的 `idempotency_key`；如果调用超时或结果不明，用同一个 key 和同样的分数重试，不要换 key。不传日期或时区；服务端按排行榜唯一时区归档，当天再次提交会覆盖当天最终分数。
 5. 如果提交返回 `STALE_CRITERIA`，立即调用一次 `get_leaderboard_definition`，覆盖旧缓存，按新标准重新计算全部维度，并用新的幂等键重提。若刷新后仍返回 stale，停止重试并报告服务端规则状态异常。
 
 ## 已确认默认规则
@@ -40,6 +44,10 @@
 - 出现明显不健康行为时，相关单项以及薄肌分最高 50 分。
 
 这些是已确认的默认规则。排行榜创建者可以用一段自然语言发布新版标准；新版只从下一周周期生效。参与排行榜时以当前周期缓存的 MCP definition 为准，并按上面的周期边界和 stale 响应刷新；不要每次打分都拉取。
+
+## 创建者
+
+用户想自己建一个排行榜时，用 `create_leaderboard`，`creator_subject` 填该用户的 `member_subject`（没有就先按上面生成）；建好后用户自己也要 `join_leaderboard` 才会上榜。把新排行榜 ID 告诉用户，由用户决定分享给谁。只有创建者能用 `add_dimension` 和 `update_scoring_criteria`（`actor_subject` 同样填创建者的 `member_subject`），新维度和新标准都从下一周期生效。
 
 ## 排名
 

@@ -94,6 +94,9 @@ test("weekly leaderboard sums each day's final score instead of averaging", asyn
   const weekly = await service.getLeaderboard({ leaderboard_id: leaderboardId, period: "week" });
   assert.equal((weekly.entries as Array<Record<string, unknown>>)[0].score, 160);
   assert.equal(weekly.scoring, "sum_of_each_day_final_score");
+  const entry = (weekly.entries as Array<Record<string, unknown>>)[0];
+  assert.equal(entry.display_name, "Alice");
+  assert.equal("member_subject" in entry, false);
 });
 
 test("criteria updates and added dimensions take effect next cycle only", async () => {
