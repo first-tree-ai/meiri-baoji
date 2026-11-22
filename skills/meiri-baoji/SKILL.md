@@ -4,7 +4,7 @@ required-mcp:
   - name: meiri-baoji-leaderboard
     url: https://meiri-baoji-leaderboard.vercel.app/api/mcp
     auth: oauth
-description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补水的日常指导，并可在用户明确同意后使用薄肌教练排行榜 MCP。包括目标访谈、饮食点评与营养估算、训练记录与统计、运动和饮食计划、评分与周复盘。用户提到健身、减脂、增肌、饮食打卡、训练打卡、喝水、睡眠、薄肌分或排行榜，或发来吃了什么、练了什么时使用。
+description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补水的日常指导，并可在用户明确同意后使用薄肌教练排行榜 MCP。包括了解用户目标、饮食点评与营养估算、训练记录与统计、运动和饮食计划、评分与周复盘。用户提到健身、减脂、增肌、饮食打卡、训练打卡、喝水、睡眠、薄肌分或排行榜，或发来吃了什么、练了什么时使用。
 ---
 
 # 每日薄肌
@@ -21,7 +21,7 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 
 1. 建 `baoji/` 和 `baoji/log/`。
 2. 只把 `references/playbook.md` 和 `references/goal-interview.md` 复制进 `baoji/`。复制后它们属于用户（偏好和访谈进度），skill 升级时不要覆盖，也不要把用户的改动写回 skill。
-3. 用一句话说明你是健康教练、能帮什么，不列举功能清单（训练计划、评分、排行榜等等用户问到或用到时再说）。然后开始目标访谈，一次只问一个问题。
+3. 用一句话说明你是健康教练、能帮什么，不列举功能清单（训练计划、评分、排行榜等等用户问到或用到时再说）。然后按 `references/goal-interview.md` 只问最多两个问题，就开始给用户实际帮助；不做长访谈。
 
 `operations.md`、`scoring.md`、`leaderboard.md`、`apple-health.md` 是规则和流程，始终从本 Skill 的 `references/` 读取，这样 Skill 升级（例如排行榜 MCP 调用方式变化）会直接生效。如果 `baoji/` 里有旧版本复制过去的这几个文件，以 Skill 里的为准；用户在其中写过的个人偏好挪进 `baoji/playbook.md`。
 
