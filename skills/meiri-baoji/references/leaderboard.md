@@ -6,7 +6,7 @@
 
 - `leaderboard_id`：用户给了排行榜 ID 或邀请里带了 ID 就用它；否则用默认排行榜 `thin-muscle-default`。
 - 身份：排行榜 MCP 用 OAuth 登录（用户的 openTag 账号），服务端从登录得到用户身份，工具里没有身份参数。MCP 还没授权时，按平台提示让用户完成授权，再继续。
-- `display_name`：问用户想在榜上显示什么昵称，不默认用真名。
+- `display_name`：先看 `baoji/profile.md` 和 `baoji/leaderboard-state.json` 里有没有已确认的昵称，有就直接用，不再问；没有才问一次用户想在榜上显示什么昵称（不默认用真名），问到后马上写进 `profile.md`。
 
 用户同意加入后，调用 `join_leaderboard`，再调用一次 `get_leaderboard_definition`。把 membership 和完整 definition 写入本地 `baoji/leaderboard-state.json`，至少保存：
 
