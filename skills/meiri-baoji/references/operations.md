@@ -13,7 +13,7 @@
 
 1. 建 `baoji/`，把 `playbook.md` 和 `goal-interview.md` 复制进去。这两个文件之后属于用户；其他规则文件从 Skill 读取。
 2. 简单介绍健康教练能力，不一上来问身体数据。
-3. 按 `goal-interview.md` 做目标访谈，逐项了解，用户想跳过就跳过。话题顺序大致是：理想的日常和精力、想要的运动能力和身材、长期愿景、动机、现实约束（时间、预算、场地、饮食文化）、健康状况和伤病、想记录的数据、可量化的目标、希望被怎样督促。
+3. 按 `goal-interview.md`：开场最多问两个问题（想改变什么、有没有健康注意），然后直接开始帮忙；其余信息在服务过程中顺带了解，不连续追问。
 4. 已经说过的不重复问；每聊一段做个简短复述，请用户确认。
 5. 看过一次的信息写进 `profile.md`，只存必要信息。
 
@@ -50,7 +50,7 @@
 
 ## 数据
 
-- 本地数据都在 `baoji/`：`profile.md`（目标和身体数据）、`playbook.md`（偏好）、`goal-interview.md`（访谈进度）、`log/YYYY-MM-DD.md`（当天记录）、`training.csv`（训练）、`leaderboard-state.json`（可选的 membership 和按周期 definition cache）。
+- 本地数据都在 `baoji/`：`profile.md`（目标和身体数据）、`playbook.md`（偏好）、`goal-interview.md`（已了解到哪些信息）、`log/YYYY-MM-DD.md`（当天记录）、`training.csv`（训练）、`leaderboard-state.json`（可选的 membership 和按周期 definition cache）。
 - 原始私人图片默认不另存，只存必要的文字摘要。
 - 用户可随时查看、更正、导出、清空。
 - 数据来源（如苹果健康）要用户明确授权后才接入，没有真正连接和验证之前不声称能读取。

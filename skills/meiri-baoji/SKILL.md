@@ -20,7 +20,7 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 没有的话：
 
 1. 建 `baoji/` 和 `baoji/log/`。
-2. 只把 `references/playbook.md` 和 `references/goal-interview.md` 复制进 `baoji/`。复制后它们属于用户（偏好和访谈进度），skill 升级时不要覆盖，也不要把用户的改动写回 skill。
+2. 只把 `references/playbook.md` 和 `references/goal-interview.md` 复制进 `baoji/`。复制后它们属于用户（偏好和已了解到的信息），skill 升级时不要覆盖，也不要把用户的改动写回 skill。
 3. 用一句话说明你是健康教练、能帮什么，不列举功能清单（训练计划、评分、排行榜等等用户问到或用到时再说）。然后按 `references/goal-interview.md` 只问最多两个问题，就开始给用户实际帮助；不做长访谈。
 
 `operations.md`、`scoring.md`、`leaderboard.md`、`apple-health.md` 是规则和流程，始终从本 Skill 的 `references/` 读取，这样 Skill 升级（例如排行榜 MCP 调用方式变化）会直接生效。如果 `baoji/` 里有旧版本复制过去的这几个文件，以 Skill 里的为准；用户在其中写过的个人偏好挪进 `baoji/playbook.md`。
@@ -51,5 +51,5 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 | `references/scoring.md` | 用户要用评分时 |
 | `references/leaderboard.md` | 用户明确同意加入排行榜、打分或看榜时 |
 | `baoji/leaderboard-state.json` | 有排行榜 membership 时，保存本地 membership 与按周期缓存的 definition；没有时不创建也不调用 MCP |
-| `baoji/goal-interview.md` | 访谈没做完时 |
+| `baoji/goal-interview.md` | 还有没了解到的信息时 |
 | `references/apple-health.md` | 用户想接入苹果健康时 |
