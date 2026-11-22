@@ -14,23 +14,29 @@ https://<your-project>.vercel.app/api/mcp
 
 ## 鉴权
 
-openTag「Agent 身份」模式（team-context `personal-agent/mcp-auth-modes.md`，opentag#1941）：openTag 是授权服务器和客户端，本 MCP 是资源服务器，**什么都不用注册**。
+OAuth 2.1，带动态客户端注册（RFC 7591）。用户用自己的 openTag 账号登录（Sign in with openTag）。MCP 服务本身就是授权服务器：
 
-- `/.well-known/oauth-protected-resource/api/mcp`（及根路径）返回 PRM：`resource` = 本 MCP 地址，`authorization_servers` = openTag issuer，`opentag_auth_mode: "agent"`；
-- 未带令牌或令牌无效返回 401，`WWW-Authenticate: Bearer resource_metadata="<PRM 地址>"`；
-- 令牌是 openTag 签发的 JWT，用 issuer discovery 里的 `jwks_uri` 校验签名，并校验 `iss`、`aud` = 本 MCP 地址、`exp`、有效期不超过 15 分钟、`opentag_subject_type` = `agent`；
-- 身份 = `agent:<sub>`（openTag 给本 MCP 的 Agent ID，不同 MCP 之间无法关联）。工具不接受任何身份参数。
+- 未带令牌的请求返回 401，`WWW-Authenticate` 里带 `resource_metadata`，指向 `/.well-known/oauth-protected-resource/api/mcp`；
+- `/.well-known/oauth-authorization-server` 声明 `/oauth/register`、`/oauth/authorize`、`/oauth/token`，只支持 S256 PKCE；
+- `/oauth/authorize` 把用户带到 openTag 登录和授权页，openTag 回调 `/oauth/callback`，服务端取 openTag 给本应用的用户 ID（`sub`）作为身份，再给客户端发授权码；
+- 访问令牌 1 小时有效，刷新令牌 30 天有效。
+
+身份只来自令牌：工具不接受 `member_subject` / `creator_subject` / `actor_subject`。同一个 openTag 账号在本应用下的 `sub` 稳定，并且和其他应用看到的不同。
+
+客户端、授权码和令牌都由服务端用 `MCP_OAUTH_SECRET` 加密封装（AES-256-GCM），不存储。由此带来的限制：授权码 60 秒内不能保证只用一次（换令牌仍需客户端密钥和 PKCE verifier）；单个刷新令牌无法提前吊销，在 openTag 撤销授权后，已有刷新令牌最长还能用 30 天；轮换 `MCP_OAUTH_SECRET` 会让所有客户端和令牌失效，用户需要重新授权。
 
 服务端环境变量：
 
 ```text
 LARK_APP_ID / LARK_APP_SECRET / LARK_BASE_TOKEN   # 专用读写飞书应用 + Base
-MCP_PUBLIC_URL                                    # 本部署的公开地址
-OPENTAG_OAUTH_ISSUER                              # staging https://dev.opentag.build/api/v1/auth，prod https://app.opentag.build/api/v1/auth
+MCP_PUBLIC_URL                                    # 本部署的公开地址，也是 OAuth issuer
+MCP_OAUTH_SECRET                                  # ≥32 位随机字符
+OPENTAG_OAUTH_ISSUER                              # 例如 https://app.opentag.build/api/v1/auth
+OPENTAG_OAUTH_CLIENT_ID / OPENTAG_OAUTH_CLIENT_SECRET   # 在 openTag「开发者应用」里为本 MCP 注册的应用
 MCP_ALLOWED_ORIGINS                               # 可选，逗号分隔
 ```
 
-前提：目标环境的 openTag 已上线 MCP Agent 身份模式（opentag#1941）。
+openTag 应用的回调地址填 `<MCP_PUBLIC_URL>/oauth/callback`，范围只需要 `openid`。前提是目标环境已打开 openTag 的 OAuth 提供方（`OPENTAG_OAUTH_PROVIDER_ENABLED`）。
 
 ## 工具
 
@@ -78,4 +84,4 @@ npm run build
 vercel --prod
 ```
 
-不要把 Vercel token 或飞书 App Secret 放在命令历史、仓库文件或聊天消息里。部署后先访问 `/api/health`；只有返回 `ready` 才表示上述必要配置都已装入。随后让 openTag Agent 挂载此 MCP，完成 initialize、tools/list 和一次只读调用。若项目启用了 Vercel Deployment Protection，还需要在 Vercel 侧为正式 MCP 客户端放行，不能把保护绕过令牌写进仓库或群聊。
+不要把 Vercel token、飞书 App Secret、openTag 客户端密钥或 `MCP_OAUTH_SECRET` 放在命令历史、仓库文件或聊天消息里。部署后先访问 `/api/health`；只有返回 `ready` 才表示上述必要配置都已装入。随后用 MCP 客户端（例如 openTag Agent 挂载此 MCP）走一遍 OAuth 授权，再完成 initialize、tools/list 和一次只读调用。若项目启用了 Vercel Deployment Protection，还需要在 Vercel 侧为正式 MCP 客户端放行，不能把保护绕过令牌写进仓库或群聊。

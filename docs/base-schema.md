@@ -32,4 +32,4 @@ Base 名称：`薄肌教练排行榜`。Base 自身时区设为 `Asia/Shanghai`�
 
 Base 没有唯一约束，多个实例并发提交可能让同一人同一天有多行。读取时每个 `(member_subject, local_date)` 只取一行作为最终快照：`submitted_at` 最大者，相同再比 `idempotency_key`、记录 ID，所有实例结果一致，不会重复累计。当天已处理过的幂等键都保留：同 key 同内容的重放视为成功且不改变最终快照，同 key 不同内容被拒绝。
 
-`member_subject` 是服务端从 openTag 访问令牌得到的身份（`agent:<openTag 给本 MCP 的 Agent ID>`），不来自工具参数，也不会出现在排行榜返回结果里。鉴权不需要表。
+`member_subject` 是服务端从 OAuth 访问令牌得到的身份（`opentag:<openTag 给本应用的用户 ID>`），不来自工具参数，也不会出现在排行榜返回结果里。OAuth 不需要表：客户端、授权码和令牌都由服务端用 `MCP_OAUTH_SECRET` 加密封装，不落库。

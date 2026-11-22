@@ -2,8 +2,7 @@ import { createMcpHandler, McpServer } from "@modelcontextprotocol/server";
 import * as z from "zod/v4";
 import { LeaderboardService } from "./service.js";
 import { EnvLarkBaseStore } from "./store.js";
-import type { JWTVerifyGetKey } from "jose";
-import { authConfigFromEnv, resourceMetadataUrl, resourceUrl, verifyAgentToken } from "./auth.js";
+import { oauthConfigFromEnv, resourceMetadataUrl, verifyAccessToken } from "./oauth.js";
 
 function jsonResult(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }] };
@@ -19,8 +18,8 @@ function toolResult(action: () => Promise<unknown>) {
 }
 
 /**
- * Build the server for one authenticated Agent. `subject` comes from the verified openTag access token
- * (`agent:<per-resource sub>`), so no tool accepts an identity argument.
+ * Build the server for one authenticated person. `subject` comes from the verified OAuth access token
+ * (the openTag per-app user ID), so no tool accepts an identity argument.
  */
 export function buildServer(subject: string, service = new LeaderboardService(new EnvLarkBaseStore())): McpServer {
   const server = new McpServer({ name: "meiri-baoji-leaderboard", version: "0.1.0" });
@@ -147,18 +146,14 @@ function unauthorized(message: string, status: number, challenge?: string): Resp
   );
 }
 
-export async function handleMcpRequest(
-  request: Request,
-  handler = defaultHandler,
-  keys?: JWTVerifyGetKey
-): Promise<Response> {
-  const config = authConfigFromEnv();
-  if (!config) return unauthorized("Auth is not configured", 503);
-  const challenge = `Bearer resource_metadata="${resourceMetadataUrl(config)}"`;
+export async function handleMcpRequest(request: Request, handler = defaultHandler): Promise<Response> {
+  const config = oauthConfigFromEnv();
+  if (!config) return unauthorized("OAuth is not configured", 503);
+  const challenge = `Bearer resource_metadata="${resourceMetadataUrl(config)}", scope="leaderboard"`;
   const header = request.headers.get("authorization") || "";
   const supplied = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
-  const identity = supplied ? await verifyAgentToken(config, supplied, keys) : undefined;
-  if (!identity) return unauthorized(supplied ? "Invalid or expired access token" : "An openTag Agent token is required", 401, challenge);
+  const claims = supplied ? verifyAccessToken(config, supplied) : undefined;
+  if (!claims) return unauthorized(supplied ? "Invalid or expired access token" : "Sign in with openTag is required", 401, challenge);
 
   const origin = request.headers.get("origin");
   const allowed = (process.env.MCP_ALLOWED_ORIGINS || "")
@@ -171,11 +166,11 @@ export async function handleMcpRequest(
   return handler.fetch(request, {
     authInfo: {
       token: supplied,
-      clientId: identity.clientId ?? "opentag",
-      scopes: identity.scopes,
-      expiresAt: identity.expiresAt,
-      resource: new URL(resourceUrl(config)),
-      extra: { subject: identity.subject }
+      clientId: claims.cid,
+      scopes: [claims.scope],
+      expiresAt: claims.exp,
+      resource: new URL(`${config.publicUrl}/api/mcp`),
+      extra: { subject: `opentag:${claims.sub}` }
     }
   });
 }

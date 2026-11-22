@@ -5,7 +5,7 @@
 ## 加入与本地缓存
 
 - `leaderboard_id`：用户给了排行榜 ID 或邀请里带了 ID 就用它；否则用默认排行榜 `thin-muscle-default`。
-- 身份：排行榜 MCP 以这个 Agent 的身份接入（平台自动处理，不需要用户授权），服务端从令牌得到身份，工具里没有身份参数。
+- 身份：排行榜 MCP 用 OAuth 登录（用户的 openTag 账号），服务端从登录得到用户身份，工具里没有身份参数。MCP 还没授权时，按平台提示让用户完成授权，再继续。
 - `display_name`：问用户想在榜上显示什么昵称，不默认用真名。
 
 用户同意加入后，调用 `join_leaderboard`，再调用一次 `get_leaderboard_definition`。把 membership 和完整 definition 写入本地 `baoji/leaderboard-state.json`，至少保存：
