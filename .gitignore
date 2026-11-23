@@ -1,2 +1,7 @@
 baoji/
 .DS_Store
+node_modules/
+dist/
+.vercel/
+.env*
+!.env.example
