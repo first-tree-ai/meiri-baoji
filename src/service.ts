@@ -84,6 +84,17 @@ export function finalSnapshots(rows: StoredRecord[], leaderboardId: string): Fin
   });
 }
 
+/** Leaderboard names are matched trimmed, width-folded (NFKC) and case-insensitively. */
+export function normalizeLeaderboardName(name: string): string {
+  return name.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+/** Users choose a leaderboard by name; the Agent may also pass the ID it cached after joining. */
+export interface LeaderboardRef {
+  leaderboard_id?: string;
+  name?: string;
+}
+
 export class LeaderboardService {
   constructor(
     private readonly store: RecordStore,
@@ -95,10 +106,16 @@ export class LeaderboardService {
     timezone: string;
     creator_subject: string;
   }): Promise<Record<string, unknown>> {
-    const name = required(input.name, "name");
+    const name = required(input.name, "name").normalize("NFKC").replace(/\s+/g, " ");
+    if (name.length > 40) throw new Error("name must be at most 40 characters");
     const timezone = required(input.timezone, "timezone");
     const creator = required(input.creator_subject, "creator_subject");
     assertTimezone(timezone);
+    // Bitable has no unique constraint: two simultaneous creates can still both land, and lookups by name
+    // then resolve deterministically (see resolve).
+    if ((await this.activeLeaderboards()).some((record) => normalizeLeaderboardName(text(record.fields.name)) === normalizeLeaderboardName(name))) {
+      throw new Error(`NAME_TAKEN: a leaderboard named "${name}" already exists; join it or choose another name`);
+    }
     const id = `lb_${randomUUID()}`;
     const today = localDate(this.clock.now(), timezone);
     const activeFrom = cycleStart(today);
@@ -136,18 +153,19 @@ export class LeaderboardService {
     return this.getDefinition({ leaderboard_id: id });
   }
 
-  async join(input: {
-    leaderboard_id: string;
+  async join(input: LeaderboardRef & {
     member_subject: string;
     display_name: string;
   }): Promise<Record<string, unknown>> {
-    await this.leaderboard(input.leaderboard_id);
+    const leaderboard = await this.resolve(input);
+    const leaderboardId = text(leaderboard.fields.leaderboard_id);
+    const leaderboardName = text(leaderboard.fields.name);
     const memberSubject = required(input.member_subject, "member_subject");
     const displayName = required(input.display_name, "display_name");
     const records = await this.store.list(TABLES.members);
     const existing = records.find(
       (record) =>
-        text(record.fields.leaderboard_id) === input.leaderboard_id &&
+        text(record.fields.leaderboard_id) === leaderboardId &&
         text(record.fields.member_subject) === memberSubject
     );
     const now = this.clock.now().toISOString();
@@ -161,23 +179,24 @@ export class LeaderboardService {
           left_at: ""
         });
       }
-      return { membership_id: text(existing.fields.membership_id), status: "active", idempotent: true };
+      return { leaderboard_id: leaderboardId, name: leaderboardName, membership_id: text(existing.fields.membership_id), status: "active", idempotent: true };
     }
     const membershipId = `mem_${randomUUID()}`;
     await this.store.create(TABLES.members, {
       membership_id: membershipId,
-      leaderboard_id: input.leaderboard_id,
+      leaderboard_id: leaderboardId,
       member_subject: memberSubject,
       display_name: displayName,
       status: "active",
       joined_at: now,
       left_at: ""
     });
-    return { membership_id: membershipId, status: "active", idempotent: false };
+    return { leaderboard_id: leaderboardId, name: leaderboardName, membership_id: membershipId, status: "active", idempotent: false };
   }
 
-  async leave(input: { leaderboard_id: string; member_subject: string }): Promise<Record<string, unknown>> {
-    const member = await this.member(input.leaderboard_id, input.member_subject, false);
+  async leave(input: LeaderboardRef & { member_subject: string }): Promise<Record<string, unknown>> {
+    const leaderboardId = text((await this.resolve(input)).fields.leaderboard_id);
+    const member = await this.member(leaderboardId, input.member_subject, false);
     if (!member || text(member.fields.status) === "left") {
       return { status: "left", idempotent: true };
     }
@@ -392,12 +411,12 @@ export class LeaderboardService {
     return { local_date: today, idempotent: false, overwritten: todayRows.length > 0, submitted_at: submittedAt };
   }
 
-  async getLeaderboard(input: {
-    leaderboard_id: string;
+  async getLeaderboard(input: LeaderboardRef & {
     period: "day" | "week";
     dimension_id?: string;
   }): Promise<Record<string, unknown>> {
-    const leaderboard = await this.leaderboard(input.leaderboard_id);
+    const leaderboard = await this.resolve(input);
+    const leaderboardId = text(leaderboard.fields.leaderboard_id);
     const timezone = text(leaderboard.fields.timezone);
     const today = localDate(this.clock.now(), timezone);
     const weekStart = cycleStart(today);
@@ -407,7 +426,7 @@ export class LeaderboardService {
       this.store.list(TABLES.members)
     ]);
     const totals = new Map<string, number>();
-    for (const snapshot of finalSnapshots(rows, input.leaderboard_id)) {
+    for (const snapshot of finalSnapshots(rows, leaderboardId)) {
       if (input.period === "day" ? snapshot.date !== today : !inCycle(snapshot.date, weekStart)) continue;
       const score = snapshot.scores.get(dimensionId);
       if (score === undefined) continue;
@@ -415,7 +434,7 @@ export class LeaderboardService {
     }
     const names = new Map(
       members
-        .filter((record) => text(record.fields.leaderboard_id) === input.leaderboard_id)
+        .filter((record) => text(record.fields.leaderboard_id) === leaderboardId)
         .map((record) => [text(record.fields.member_subject), text(record.fields.display_name)])
     );
     const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
@@ -428,7 +447,8 @@ export class LeaderboardService {
       return { rank: lastRank, display_name: names.get(subject) || "成员", score };
     });
     return {
-      leaderboard_id: input.leaderboard_id,
+      leaderboard_id: leaderboardId,
+      name: text(leaderboard.fields.name),
       timezone,
       period: input.period,
       dimension_id: dimensionId,
@@ -439,11 +459,29 @@ export class LeaderboardService {
     };
   }
 
+  private async activeLeaderboards(): Promise<StoredRecord[]> {
+    return (await this.store.list(TABLES.leaderboards)).filter((item) => text(item.fields.status) === "active");
+  }
+
+  /** Find a leaderboard by ID or, as users do, by name. Duplicate names (a create race) resolve to the same one every time. */
+  private async resolve(ref: LeaderboardRef): Promise<StoredRecord> {
+    if (ref.leaderboard_id?.trim()) return this.leaderboard(ref.leaderboard_id.trim());
+    const wanted = normalizeLeaderboardName(ref.name || "");
+    if (!wanted) throw new Error("name or leaderboard_id is required");
+    const matches = (await this.activeLeaderboards())
+      .filter((item) => normalizeLeaderboardName(text(item.fields.name)) === wanted)
+      .sort((a, b) => text(a.fields.leaderboard_id).localeCompare(text(b.fields.leaderboard_id)));
+    if (!matches.length) {
+      throw new Error(`NOT_FOUND: no leaderboard named "${(ref.name || "").trim()}"; check the name with the user, or offer to create one with create_leaderboard`);
+    }
+    return matches[0];
+  }
+
   private async leaderboard(id: string): Promise<StoredRecord> {
     const record = (await this.store.list(TABLES.leaderboards)).find(
       (item) => text(item.fields.leaderboard_id) === id && text(item.fields.status) === "active"
     );
-    if (!record) throw new Error(`Leaderboard not found: ${id}`);
+    if (!record) throw new Error(`NOT_FOUND: leaderboard not found: ${id}`);
     return record;
   }
 

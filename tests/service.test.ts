@@ -281,3 +281,28 @@ test("a replay of an older submission never overwrites a newer final snapshot", 
   assert.equal(await dayScore(), 85);
   await assert.rejects(() => service.submitDailyUpdate({ ...a, scores: scores(definition, [1, 2, 3]) }), /already used with different scores/);
 });
+
+test("leaderboard names are unique ignoring case, width and surrounding spaces", async () => {
+  const service = new LeaderboardService(new MemoryStore(), new FakeClock(new Date("2026-11-19T15:30:00Z")));
+  await service.createLeaderboard({ name: "Office Fit", timezone: "Asia/Shanghai", creator_subject: "a" });
+  await assert.rejects(
+    () => service.createLeaderboard({ name: "  office  FIT ", timezone: "Asia/Shanghai", creator_subject: "b" }),
+    /NAME_TAKEN/
+  );
+  await assert.rejects(() => service.createLeaderboard({ name: "Ｏｆｆｉｃｅ Fit", timezone: "Asia/Shanghai", creator_subject: "b" }), /NAME_TAKEN/);
+});
+
+test("join, rank and leave by name; unknown names say NOT_FOUND with a hint", async () => {
+  const service = new LeaderboardService(new MemoryStore(), new FakeClock(new Date("2026-11-19T15:30:00Z")));
+  const created = await service.createLeaderboard({ name: "薄肌教练排行榜", timezone: "Asia/Shanghai", creator_subject: "creator" });
+  const joined = await service.join({ name: " 薄肌教练排行榜 ", member_subject: "alice", display_name: "Alice" });
+  assert.equal(joined.leaderboard_id, created.leaderboard_id);
+  assert.equal(joined.name, "薄肌教练排行榜");
+  await service.submitDailyUpdate({ leaderboard_id: String(created.leaderboard_id), member_subject: "alice", idempotency_key: "k", scores: scores(created) });
+  const board = await service.getLeaderboard({ name: "薄肌教练排行榜", period: "day" });
+  assert.equal(board.name, "薄肌教练排行榜");
+  assert.equal((board.entries as unknown[]).length, 1);
+  await assert.rejects(() => service.join({ name: "不存在的榜", member_subject: "alice", display_name: "Alice" }), /NOT_FOUND: .*create_leaderboard/);
+  await assert.rejects(() => service.join({ member_subject: "alice", display_name: "Alice" }), /name or leaderboard_id is required/);
+  assert.equal((await service.leave({ name: "薄肌教练排行榜", member_subject: "alice" })).status, "left");
+});

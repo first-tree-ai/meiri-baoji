@@ -27,9 +27,9 @@ export function buildServer(subject: string, service = new LeaderboardService(ne
   server.registerTool(
     "create_leaderboard",
     {
-      description: "Bootstrap a leaderboard with the confirmed default diet, exercise, and thin-muscle dimensions. The signed-in person becomes its creator.",
+      description: "Create a leaderboard with the confirmed default diet, exercise, and thin-muscle dimensions; others join it by name. Names are unique (case-insensitive): NAME_TAKEN means pick another or join the existing one. The signed-in person becomes its creator.",
       inputSchema: z.object({
-        name: z.string().min(1),
+        name: z.string().min(1).max(40).describe("Name users will say to join it"),
         timezone: z.string().min(1).describe("One IANA timezone shared by the leaderboard, such as Asia/Shanghai")
       })
     },
@@ -39,8 +39,12 @@ export function buildServer(subject: string, service = new LeaderboardService(ne
   server.registerTool(
     "join_leaderboard",
     {
-      description: "Join or rejoin an existing leaderboard as the signed-in person.",
-      inputSchema: z.object({ leaderboard_id: z.string(), display_name: z.string().min(1).max(40) })
+      description: "Join or rejoin an existing leaderboard as the signed-in person, by its name (or a known ID). NOT_FOUND means no leaderboard has that name.",
+      inputSchema: z.object({
+        name: z.string().optional().describe("Leaderboard name as the user said it (matched case-insensitively)"),
+        leaderboard_id: z.string().optional().describe("Only if already known from an earlier result; users never see IDs"),
+        display_name: z.string().min(1).max(40)
+      })
     },
     (input) => toolResult(() => service.join({ ...input, member_subject: subject }))
   );
@@ -49,7 +53,7 @@ export function buildServer(subject: string, service = new LeaderboardService(ne
     "leave_leaderboard",
     {
       description: "Leave a leaderboard. Existing score snapshots remain for historical rankings.",
-      inputSchema: z.object({ leaderboard_id: z.string() })
+      inputSchema: z.object({ name: z.string().optional(), leaderboard_id: z.string().optional() })
     },
     (input) => toolResult(() => service.leave({ ...input, member_subject: subject }))
   );
@@ -115,7 +119,8 @@ export function buildServer(subject: string, service = new LeaderboardService(ne
     {
       description: "Get the current daily or weekly ranking. Weekly score is the sum of each day's final snapshot, never an average.",
       inputSchema: z.object({
-        leaderboard_id: z.string(),
+        name: z.string().optional(),
+        leaderboard_id: z.string().optional(),
         period: z.enum(["day", "week"]),
         dimension_id: z.string().optional()
       })

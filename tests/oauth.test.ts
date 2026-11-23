@@ -245,6 +245,8 @@ test("tools take identity from the token, never from arguments", async () => {
     handler
   );
   assert.equal(join.status, 200);
+  // The legacy leg streams over SSE: the tool finishes only once the body is read.
+  await join.text();
   const members = await store.list(TABLES.members);
   assert.equal(members.length, 1);
   assert.equal(members[0].fields.member_subject, "opentag:pairwise-alice");

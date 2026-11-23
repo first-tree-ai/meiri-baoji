@@ -4,13 +4,15 @@
 
 ## 加入与本地缓存
 
-- `leaderboard_id`：用户给了排行榜 ID 或邀请里带了 ID 就用它；否则用默认排行榜 `thin-muscle-default`。
+- 选榜靠名字：用户说要加入哪个排行榜，就把他说的名字传给 `join_leaderboard` 的 `name`；用户没说具体哪个，就用默认的「薄肌教练排行榜」。名字不区分大小写和前后空格。
+- 找不到（`NOT_FOUND`）：告诉用户没找到这个名字的排行榜，请他核对一下名字；或者问他要不要用这个名字新建一个。
+- 排行榜 ID 只给你自己用：`join_leaderboard` 返回的 `leaderboard_id` 存进本地状态，之后提交、取规则时用它；不要把 ID、链接或文件路径说给用户，对用户只说排行榜的名字。
 - 身份：排行榜 MCP 用 OAuth 登录（用户的 openTag 账号），服务端从登录得到用户身份，工具里没有身份参数。MCP 还没授权时，按平台提示让用户完成授权，再继续。
 - `display_name`：先看 `baoji/profile.md` 和 `baoji/leaderboard-state.json` 里有没有已确认的昵称，有就直接用，不再问；没有才问一次用户想在榜上显示什么昵称（不默认用真名），问到后马上写进 `profile.md`。
 
 用户同意加入后，调用 `join_leaderboard`，再调用一次 `get_leaderboard_definition`。把 membership 和完整 definition 写入本地 `baoji/leaderboard-state.json`，至少保存：
 
-- `leaderboard_id`、`display_name`、`membership_id` 和 membership `status`；
+- 排行榜名字、`leaderboard_id`、`display_name`、`membership_id` 和 membership `status`；
 - definition 的 `timezone`、`current_cycle_start`、`next_cycle_start`、全部维度、自然语言标准和 `criteria_version_id`；
 - `cached_at`，只用于排查缓存，不作为服务端归档时间。
 
@@ -47,7 +49,7 @@
 
 ## 创建者
 
-用户想自己建一个排行榜时，用 `create_leaderboard`，当前登录的用户就是创建者；建好后用户自己也要 `join_leaderboard` 才会上榜。把新排行榜 ID 告诉用户，由用户决定分享给谁。只有创建者能用 `add_dimension` 和 `update_scoring_criteria`，新维度和新标准都从下一周期生效。
+用户想自己建一个排行榜时，先问他起什么名字，用 `create_leaderboard`，当前登录的用户就是创建者；建好后用户自己也要 `join_leaderboard` 才会上榜。名字已被占用（`NAME_TAKEN`）时，请用户换个名字，或者问他是不是想加入那个已有的排行榜。告诉用户：朋友只要跟自己的助手说出这个排行榜的名字就能加入，由用户决定告诉谁。只有创建者能用 `add_dimension` 和 `update_scoring_criteria`，新维度和新标准都从下一周期生效。
 
 ## 排名
 
