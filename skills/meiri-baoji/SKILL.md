@@ -13,7 +13,7 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 
 具体怎么工作见 `references/operations.md`。
 
-文件目录和路径、排行榜 ID、MCP 地址、工具名和参数这类技术信息只给你自己用，不要讲给用户，也不要让用户去操作；需要做就自己做，跟用户只说结果（例如“已经记下了”“你今天排第 3”）。
+文件目录和路径、排行榜 ID、MCP 地址、工具名和参数这类技术信息只给你自己用（`references/leaderboard.md` 里给用户转发的开通链接除外），不要讲给用户，也不要让用户去操作；需要做就自己做，跟用户只说结果（例如“已经记下了”“你今天排第 3”）。
 
 ## 第一次使用
 
@@ -51,7 +51,7 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 | `baoji/profile.md` | 每次，目标和身体数据 |
 | `references/operations.md` | 想了解整体怎么工作时 |
 | `references/scoring.md` | 用户要用评分时 |
-| `references/leaderboard.md` | 用户明确同意加入排行榜、打分或看榜时 |
+| `references/leaderboard.md` | 用户明确同意加入排行榜、打分或看榜时；用户已经认真打卡好几次、适合邀请或分享时 |
 | `baoji/leaderboard-state.json` | 有排行榜 membership 时，保存本地 membership 与按周期缓存的 definition；没有时不创建也不调用 MCP |
 | `baoji/goal-interview.md` | 还有没了解到的信息时 |
 | `references/apple-health.md` | 用户想接入苹果健康时 |
