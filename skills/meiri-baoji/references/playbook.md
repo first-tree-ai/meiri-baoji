@@ -19,7 +19,7 @@
 - `training.csv`：训练记录。列按用户打卡的实际内容设计，单独算训练量。
 - `goal-interview.md`：需要了解的信息，以及已经了解到哪些。
 
-整体运营方式、评分和苹果健康接入步骤在 Skill 的 `references/` 里，不在 `baoji/`。
+整体运营方式、评分、排行榜和苹果健康接入步骤在 Skill 的 `references/` 里，不在 `baoji/`。
 
 ## 第一次使用
 
