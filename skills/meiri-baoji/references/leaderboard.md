@@ -7,7 +7,7 @@
 - 选榜靠名字：用户说要加入哪个排行榜，就把他说的名字传给 `join_leaderboard` 的 `name`；用户没说具体哪个，就用默认的「薄肌教练排行榜」。名字不区分大小写和前后空格。
 - 找不到（`NOT_FOUND`）：告诉用户没找到这个名字的排行榜，请他核对一下名字；或者问他要不要用这个名字新建一个。
 - 排行榜 ID 只给你自己用：`join_leaderboard` 返回的 `leaderboard_id` 存进本地状态，之后提交、取规则时用它；不要把 ID、链接或文件路径说给用户，对用户只说排行榜的名字。
-- 身份：排行榜 MCP 用 OAuth 登录（用户的 openTag 账号），服务端从登录得到用户身份，工具里没有身份参数。MCP 还没授权时，按平台提示让用户完成授权，再继续。
+- 身份：排行榜 MCP 以这个 Agent 的身份接入（平台自动处理，不需要用户授权），服务端从令牌得到身份，工具里没有身份参数。
 - `display_name`：先看 `baoji/profile.md` 和 `baoji/leaderboard-state.json` 里有没有已确认的昵称，有就直接用，不再问；没有才问一次用户想在榜上显示什么昵称（不默认用真名），问到后马上写进 `profile.md`。
 
 用户同意加入后，调用 `join_leaderboard`，再调用一次 `get_leaderboard_definition`。把 membership 和完整 definition 写入本地 `baoji/leaderboard-state.json`，至少保存：

@@ -3,7 +3,7 @@ name: meiri-baoji
 required-mcp:
   - name: meiri-baoji-leaderboard
     url: https://meiri-baoji-leaderboard.vercel.app/api/mcp
-    auth: oauth
+    auth: opentag-agent
 description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补水的日常指导，并可在用户明确同意后使用薄肌教练排行榜 MCP。包括了解用户目标、饮食点评与营养估算、训练记录与统计、运动和饮食计划、评分与周复盘。用户提到健身、减脂、增肌、饮食打卡、训练打卡、喝水、睡眠、薄肌分或排行榜，或发来吃了什么、练了什么时使用。
 ---
 
