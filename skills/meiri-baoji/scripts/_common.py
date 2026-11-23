@@ -80,15 +80,24 @@ def _user_font_files():
                     yield os.path.join(dirpath, name)
 
 
-def _fontconfig_files():
-    """Fonts fontconfig says support Chinese (fc-list filters by coverage; fc-match would fall back)."""
-    if not shutil.which("fc-list"):
-        return []
+def _run(args):
     try:
-        out = subprocess.run(["fc-list", ":lang=zh", "file"], capture_output=True, text=True, timeout=10).stdout
+        return subprocess.run(args, capture_output=True, text=True, timeout=10).stdout
     except (OSError, subprocess.SubprocessError):
-        return []
-    return sorted({line.split(":")[0].strip() for line in out.splitlines() if line.strip()})
+        return ""
+
+
+def _fontconfig_files():
+    """Chinese-capable fonts from fontconfig. A bare `fc-match :lang=zh` falls back to DejaVu Sans on
+    Debian even with CJK fonts installed, so ask for sans-serif zh-cn first, then list by coverage;
+    every result still goes through the glyph check."""
+    files = []
+    if shutil.which("fc-match"):
+        files.append(_run(["fc-match", "-f", "%{file}", "sans-serif:lang=zh-cn"]).strip())
+    if shutil.which("fc-list"):
+        listed = {line.split(":")[0].strip() for line in _run(["fc-list", ":lang=zh", "file"]).splitlines() if line.strip()}
+        files.extend(sorted(listed))
+    return [path for path in files if path]
 
 
 def find_cjk_font():
