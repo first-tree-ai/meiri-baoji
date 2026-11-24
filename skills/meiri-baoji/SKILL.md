@@ -1,5 +1,6 @@
 ---
 name: meiri-baoji
+title: 每日薄肌
 required-mcp:
   - name: meiri-baoji-leaderboard
     url: https://meiri-baoji-leaderboard.vercel.app/api/mcp
