@@ -17,6 +17,8 @@ Data that does not match the template is handled by the script:
 - Too many: workout shows 5 exercises + "+N 个动作"; daily-workout folds rows so the photo stays visible;
   daily-nutrition shows 3 meals + "+N"; daily-timeline shows 6 events + "+N 项". Long text shrinks, then ends in "…".
 - Over target: bars stop at 100%, numbers are shown as they are.
+- Too little data: the script exits with "NOT_ENOUGH_DATA: …" and draws nothing; reply in text instead. Without a
+  calorie goal daily-nutrition shows the number without the gauge; meals without photos become a plain list.
 
 meal (light):
   {"photo": "meal.jpg", "label": "晚饭 · 一人份", "dishes": "青椒炒肉 · 炒菠菜 · 米饭",
@@ -423,7 +425,7 @@ def meal(spec):
     global T
     T = THEMES["light"]
     if not spec.get("photo") or not spec.get("kcal"):
-        sys.exit("meal needs photo and kcal")
+        sys.exit("NOT_ENOUGH_DATA: meal needs photo and kcal; reply in text instead")
     m, tg = spec.get("macros") or {}, spec.get("targets") or {}
     items = []
     for key, name in (("protein", "蛋白质"), ("carb", "碳水"), ("fat", "脂肪")):
@@ -468,7 +470,7 @@ def workout(spec):
     global T
     T = THEMES["dark"]
     if not spec.get("minutes"):
-        sys.exit("workout needs minutes")
+        sys.exit("NOT_ENOUGH_DATA: workout needs minutes; reply in text instead")
     photo = open_photo(spec["photo"]) if spec.get("photo") else placeholder(spec.get("sport"))
     stats = spec.get("stats") or []
     extras = [extra_text(dict(x, value="%s%s" % (x.get("value", ""), x.get("sub", "")))) for x in stats[3:]] \
@@ -533,7 +535,7 @@ def daily_nutrition(spec):
     T = THEMES["light"]
     spec["kcal"], spec["kcal_goal"] = number(spec.get("kcal")), number(spec.get("kcal_goal"))
     if not spec.get("kcal"):
-        sys.exit("daily-nutrition needs kcal")
+        sys.exit("NOT_ENOUGH_DATA: daily-nutrition needs kcal; reply in text instead")
     spec["kcal"] = int(spec["kcal"])
     spec["kcal_goal"] = int(spec["kcal_goal"]) if spec["kcal_goal"] else None
     activity = " · ".join(x for x in [spec.get("activity")] + [extra_text(e) for e in spec.get("extras") or []] if x)
@@ -541,31 +543,63 @@ def daily_nutrition(spec):
     d = draw(im)
     header(im, d, "每日总结")
     has_score = spec.get("score") is not None
+    items = macro_items(spec.get("macros"))
+    goal = spec.get("kcal_goal")
+    meals = spec.get("meals") or []
+    photo_meals = any(m.get("photo") for m in meals)
+    # Lay the blocks out first so a day with little data sits in the middle of the card, not at the top.
+    n_lines = len(summary_lines(d, spec.get("summary"), 44, W - 96 - (220 if has_score else 0)))
+    head_h = 230 if (has_score or activity) else (n_lines * 60 + 50 if n_lines else 0)
+    card_h = (590 if items else 450) if goal else 230 + (TILE_H + 32 if items else 0)
+    list_rows = min(len(meals), 5) if len(meals) <= 5 else 5
+    meals_h = (28 + (308 if photo_meals else 84 + list_rows * 52 + 12)) if meals else 0
+    bottom = H - 150 if spec.get("tomorrow") else H - 48
+    y0 = 140 + max(0, (bottom - 140 - head_h - card_h - meals_h) // 2)
     for i, ln in enumerate(summary_lines(d, spec.get("summary"), 44, W - 96 - (220 if has_score else 0))):
-        d.text((48, 150 + i * 60), ln, font=F(44), fill=T["ink"])
+        d.text((48, y0 + 10 + i * 60), ln, font=F(44), fill=T["ink"])
     if activity:
-        d.text((48, 282), fit(d, activity, 24, W - 340)[0], font=F(24), fill=T["sub"])
+        d.text((48, y0 + 142), fit(d, activity, 24, W - 340)[0], font=F(24), fill=T["sub"])
     if has_score:
-        cx, cy = W - 140, 220
+        cx, cy = W - 140, y0 + 80
         score_ring(d, cx, cy, spec["score"], "薄肌分")
         if spec.get("delta"):
             d.text((cx, cy + 118), "比昨天 %s" % spec["delta"], font=F(24), fill=T["accent_text"], anchor="mm")
-    items = macro_items(spec.get("macros"))
-    top, bot = 370, 960 if items else 820
+    top = y0 + head_h
+    bot = top + card_h  # the gauge needs a goal; without one the card shows just the number
     d.rounded_rectangle((48, top, W - 48, bot), R, fill=T["tile"])
     d.text((84, top + 30), "热量", font=F(28), fill=T["ink"])
     d.text((W - 84, top + 34), "今天", font=F(24), fill=T["sub"], anchor="ra")
-    gcx, gcy = W // 2, top + 290
-    goal = spec.get("kcal_goal")
-    gauge(im, gcx, gcy, 205, 48, spec["kcal"] / goal if goal else 0)
-    kcal, size = fit(d, spec["kcal"], 92, 300, 48)
-    d.text((gcx, gcy - 24), kcal, font=F(size), fill=T["ink"], anchor="mm")
-    d.text((gcx, gcy + 42), fit(d, "目标 %s 千卡" % goal if goal else "千卡", 26, 300)[0], font=F(26), fill=T["sub"],
-           anchor="mm")
+    if goal:
+        gcx, gcy = W // 2, top + 290
+        gauge(im, gcx, gcy, 205, 48, spec["kcal"] / goal)
+        kcal, size = fit(d, spec["kcal"], 92, 300, 48)
+        d.text((gcx, gcy - 24), kcal, font=F(size), fill=T["ink"], anchor="mm")
+        d.text((gcx, gcy + 42), fit(d, "目标 %s 千卡" % goal, 26, 300)[0], font=F(26), fill=T["sub"], anchor="mm")
+    else:
+        kcal, size = fit(d, "约 %d" % spec["kcal"], 92, 600, 48)
+        d.text((84, top + 190), kcal, font=F(size), fill=T["ink"], anchor="ls")
+        d.text((84 + d.textlength(kcal, font=F(size)) + 14, top + 190), "千卡", font=F(32), fill=T["sub"], anchor="ls")
     if items:
         nutrient_tiles(d, 80, W - 80, bot - TILE_H - 32, items, fill=T["inset"])
-    meals = spec.get("meals") or []
-    if meals:
+    if meals and not photo_meals:  # no photos: a plain list, not grey blocks
+        rows = meals[:5] if len(meals) <= 5 else meals[:4]
+        top2 = bot + 28
+        bot2 = top2 + 84 + len(rows) * 52 + (52 if len(meals) > len(rows) else 0) + 12
+        d.rounded_rectangle((48, top2, W - 48, bot2), R, fill=T["tile"])
+        d.text((84, top2 + 28), "今日餐食", font=F(28), fill=T["ink"])
+        d.text((W - 84, top2 + 32), "%d 餐" % len(meals), font=F(24), fill=T["sub"], anchor="ra")
+        for i, m in enumerate(rows):
+            ry = top2 + 84 + i * 52 + 26
+            k = "约 %s 千卡" % bare(m["kcal"], "千卡").lstrip("约 ") if m.get("kcal") else ""
+            k = fit(d, k, 24, 300)[0] if k else ""
+            d.text((W - 84, ry), k, font=F(24), fill=T["sub"], anchor="rm")
+            label = " ".join(str(v) for v in (m.get("time"), m.get("name"), m.get("desc")) if v)
+            d.text((84, ry), fit(d, label, 26, W - 168 - d.textlength(k, font=F(24)) - 24)[0], font=F(26),
+                   fill=T["ink"], anchor="lm")
+        if len(meals) > len(rows):
+            d.text((84, top2 + 84 + len(rows) * 52 + 26), "+%d 餐" % (len(meals) - len(rows)), font=F(24),
+                   fill=T["sub"], anchor="lm")
+    elif meals:
         top2, bot2 = bot + 28, bot + 336
         d.rounded_rectangle((48, top2, W - 48, bot2), R, fill=T["tile"])
         d.text((84, top2 + 28), "今日餐食", font=F(28), fill=T["ink"])
@@ -598,6 +632,8 @@ def daily_nutrition(spec):
 def daily_timeline(spec):
     global T
     T = THEMES["light"]
+    if len(spec.get("events") or []) < 2:
+        sys.exit("NOT_ENOUGH_DATA: daily-timeline needs at least 2 events; use another card or reply in text")
     im = Image.new("RGB", (W, H), T["bg"])
     d = draw(im)
     header(im, d, "每日总结")
@@ -651,6 +687,8 @@ def daily_timeline(spec):
 def daily_workout(spec):
     global T
     T = THEMES["dark"]
+    if not (spec.get("stats") or spec.get("exercises")):
+        sys.exit("NOT_ENOUGH_DATA: daily-workout needs stats or exercises; reply in text instead")
     photo = open_photo(spec["photo"]) if spec.get("photo") else placeholder(spec.get("sport"))
     stats = spec.get("stats") or []
     extras = [extra_text(dict(x, value="%s%s" % (x.get("value", ""), x.get("unit", "")))) for x in stats[3:]] \

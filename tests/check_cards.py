@@ -74,6 +74,15 @@ def cases(tmp):
                                                 "delta": "+100", "kcal": "11000 kJ", "kcal_goal": "1500 大卡",
                                                 "macros": over, "meals": meals8, "extras": extras, "tomorrow": long_text}
     yield "nutrition-half", "daily-nutrition", {"kcal": 1650, "macros": half}
+    yield "nutrition-nogoal-nophotos", "daily-nutrition", {"summary": "今天吃得挺规律。", "kcal": "约 1820 大卡", "macros": half,
+                                                           "meals": [{"name": n, "time": t, "kcal": k, "desc": dsc}
+                                                                     for n, t, k, dsc in [("早餐", "08:00", "350", "燕麦 牛奶"),
+                                                                                          ("午餐", "12:30", "700-850", "外卖双拼饭（加量版）配溏心蛋"),
+                                                                                          ("加餐", "16:00", "200", "苹果"),
+                                                                                          ("晚饭", "19:00", "600", "鸡胸肉沙拉"),
+                                                                                          ("夜宵", "23:00", "450", "饺子"),
+                                                                                          ("饮料", "21:00", "180", "奶茶半糖")]],
+                                                           "tomorrow": "明天早饭加个鸡蛋"}
     yield "timeline-normal", "daily-timeline", {"summary": "蛋白第一次吃够。", "score": 82, "delta": "+6", "kcal": 1650,
                                                 "kcal_goal": 1900, "macros": macros,
                                                 "events": [{"time": "08:10", "title": "早餐", "sub": "约 150 千卡", "photo": p2},
