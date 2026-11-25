@@ -32,17 +32,10 @@
 
 打卡、每日总结和计划可以配一张图，方便用户保存和分享。要不要用图、什么时候发、怎么发，按当前渠道 prompt 来；图做好后用渠道正常的发送方式发出，本 Skill 不自己发消息。
 
-- **打卡卡片：** 用户饮食或运动打卡后，给他做一张打卡卡片；每天结束时可以做一张每日总结卡。命令是 `python3 scripts/checkin_card.py <kind> <输出.png> <spec.json>`，都是 3:4（1080×1440），带小塔品牌胶囊。每种 spec 的字段写在脚本开头；每种卡长什么样见 `templates/` 里的模板图（meal、workout-photo、workout-nophoto、daily-nutrition、daily-timeline、daily-workout、daily-workout-nodiet）。
-  - `meal`：用户发了饭菜照片时用（浅色）。没有照片的一餐用下面的营养卡，或者只用文字。
-  - `workout`：一次训练（黑底）。用户没发照片时，按 `sport`（strength、run、cycle、swim、yoga、hiit）自动用内置占位图，不用另找图。
-  - 每日总结三选一，可以按天轮换：`daily-nutrition`（热量仪表 + 今日餐食，饮食为主的日子）、`daily-timeline`（把一天按时间排开，饮食和运动都有的日子）、`daily-workout`（训练为主；当天没有饮食数据就不传 `diet`，饮食块整块不出现）。
-  - 不知道的数据不要传，对应的块会自己隐藏；不要填 0 或“—”。热量单位一律写“千卡”，不写 kcal。
-  - 卡上的一句话（`line`、`summary`、`tomorrow`）每天自己写：短，说今天具体发生的事，不说套话，不重复卡上已有的数字。例：写“深蹲终于加上去了，腿在发抖但很稳”，不写“今天消耗 360 千卡，继续加油”。
-  - 营养素用三格短粗小卡（蛋白质、碳水、脂肪），有当天目标时显示进度；没有目标就只显示数字。
-  - 出现进食障碍迹象时不发带热量的卡片。
+- **打卡卡片和每日总结卡：** 按 SKILL.md 的「打卡卡片」一节，一条命令出图，脚本打印 OK 就发；不用读脚本或模板图。
 - **营养卡（没有照片的一餐）：** `python3 scripts/nutrition_card.py <输出.png> <spec.json>`（spec 也可以从标准输入传）。spec 写餐次、热量、蛋白、碳水、脂肪、纤维（都用范围，如 `"30-40"`）和一句最值得做的建议。卡上不写分数，不给食物贴好坏标签；出现进食障碍迹象时不做营养卡。
 - **计划图：** `python3 scripts/plan_card.py <输出.png> <spec.json>`。spec 按这位用户自己的计划写：标题、一周安排、每次训练的动作和组数、加量要点、脚注（参考计划，不是医疗处方）。不要照搬别人的计划或身体数据。饮食计划也可以用它（`kind` 用 `meal`）。
-- 脚本在本 Skill 目录的 `scripts/` 下，说明和 spec 格式写在脚本开头。生成的图片放在工作目录的临时文件夹，发完可以删；不要写进 Skill 目录。
+- 脚本在本 Skill 目录的 `scripts/` 下（营养卡和计划图的 spec 格式写在脚本开头）。生成的图片放在工作目录的临时文件夹，发完可以删；不要写进 Skill 目录。
 - 品牌字体 `assets/xiaota-wordmark.ttf` 只含“小塔”两个字的子集，按 SIL Open Font License 使用（`assets/xiaota-wordmark-OFL.txt`）；占位图来源和授权见 `assets/placeholders/CREDITS.txt`。这些文件不要改动或删掉。
 - 需要 Python 3 和 Pillow，以及一个中文字体。脚本报缺 Pillow 时先 `python3 -m pip install --user pillow` 再试；报找不到中文字体时用文字回复，不要硬发乱码图。
 

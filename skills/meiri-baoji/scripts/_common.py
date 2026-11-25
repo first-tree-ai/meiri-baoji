@@ -100,7 +100,27 @@ def _fontconfig_files():
     return [path for path in files if path]
 
 
+FONT_CACHE = os.path.join(os.environ.get("TMPDIR") or "/tmp", "baoji-cjk-font.txt")
+
+
 def find_cjk_font():
+    """The first Chinese-capable font; the answer is cached in a temp file so later cards skip the search."""
+    try:
+        cached = open(FONT_CACHE).read().strip()
+        if cached and os.path.exists(cached) and not os.environ.get("BAOJI_FONT"):
+            return cached
+    except OSError:
+        pass
+    path = _find_cjk_font()
+    try:
+        with open(FONT_CACHE, "w") as f:
+            f.write(path)
+    except OSError:
+        pass
+    return path
+
+
+def _find_cjk_font():
     override = os.environ.get("BAOJI_FONT")
     candidates = ([override] if override else []) + FONT_CANDIDATES + list(_user_font_files()) + _fontconfig_files()
     seen = set()

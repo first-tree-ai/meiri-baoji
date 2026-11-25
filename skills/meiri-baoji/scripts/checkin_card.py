@@ -3,59 +3,8 @@
 
 usage: python3 checkin_card.py <kind> <out.png> [spec.json | -]
 
-kind is one of meal, workout, daily-nutrition, daily-timeline, daily-workout. The spec is JSON
-(from a file, or stdin when '-' or omitted). Leave out anything you do not know: a missing field
-hides its block, it never shows as 0 or "—". Energy is always 千卡. Lines written by you
-(line, summary, tomorrow) must be short, specific to today, and must not repeat a number already
-on the card. Use "\\n" to break a line yourself.
-
-Data that does not match the template is handled by the script:
-- Units: energy in kcal/大卡/kJ/千焦 becomes 千卡, lb/磅 becomes kg, mi/英里 becomes 公里, inside any text.
-- No slot for it (心率, 配速, 距离, 体重, 体脂, 补剂, 单独记的饮料…): pass it in "extras" as
-  [{"name": "心率", "value": "152", "unit": "bpm"}] or plain strings. meal/workout/daily-workout show one "其他" strip
-  (what fits, then +N); daily-nutrition/daily-timeline append them to the small grey line. A 4th stat also goes there.
-- Too many: workout shows 5 exercises + "+N 个动作"; daily-workout folds rows so the photo stays visible;
-  daily-nutrition shows 3 meals + "+N"; daily-timeline shows 6 events + "+N 项". Long text shrinks, then ends in "…".
-- Over target: bars stop at 100%, numbers are shown as they are.
-- Too little data: the script exits with "NOT_ENOUGH_DATA: …" and draws nothing; reply in text instead. Without a
-  calorie goal daily-nutrition shows the number without the gauge; meals without photos become a plain list.
-
-meal (light):
-  {"photo": "meal.jpg", "label": "晚饭 · 一人份", "dishes": "青椒炒肉 · 炒菠菜 · 米饭",
-   "kcal": "650–850", "macros": {"protein": "35–50", "carb": "75–95", "fat": "25–35"},
-   "targets": {"protein": 130, "carb": 210, "fat": 60}, "line": "菜很全；炒饭吃半碗就刚好"}
-  photo is required (no photo → reply in text). targets are the user's daily grams; with them
-  each nutrient tile gets a short bar for this meal's share of the day.
-
-workout (dark):
-  {"photo": "gym.jpg", "sport": "strength", "label": "力量 · 腿日", "line": "深蹲又多了 5kg，\\n腿在变强。",
-   "minutes": 58, "score": 85, "score_label": "运动分",
-   "stats": [{"name": "消耗", "value": "约 320–400", "sub": "千卡"}, {"name": "训练量", "value": "6.9 吨", "sub": "+8% 比上次"}],
-   "exercises": [["杠铃深蹲", "4×8 · 60kg"]], "more": 2}
-  Without photo the built-in placeholder for sport is used: strength, run, cycle, swim, yoga, hiit.
-
-daily-nutrition (light, calorie gauge):
-  {"summary": "蛋白第一次吃够，\\n腿也练完了。", "activity": "腿日 58 分钟 · 睡 7h10m",
-   "score": 82, "delta": "+6", "kcal": 1650, "kcal_goal": 1900,
-   "macros": [{"name": "蛋白质", "value": 128, "target": 130}, {"name": "碳水", "value": 190, "target": 210},
-              {"name": "脂肪", "value": 58, "target": 60}],
-   "meals": [{"photo": "a.jpg", "name": "早餐", "time": "08:10", "kcal": "150–170"}],
-   "tomorrow": "明天休息，拉伸 10 分钟就好"}
-
-daily-timeline (light, the day as a time axis):
-  {"summary": ..., "score": 82, "delta": "+6", "kcal": 1650, "kcal_goal": 1900, "macros": [...],
-   "events": [{"time": "08:10", "title": "早餐 · 燕麦奶", "sub": "约 150–170 千卡", "photo": "a.jpg"},
-              {"time": "19:10", "title": "腿日 · 58 分钟", "sub": "深蹲 +5kg", "highlight": true}],
-   "tomorrow": ...}   (at most 7 events)
-
-daily-workout (dark, training first):
-  {"photo": "gym.jpg", "sport": "strength", "label": "腿日 · 19:10", "summary": "深蹲终于加上去了，\\n腿在发抖但很稳。",
-   "score": 86, "stats": [{"name": "时长", "value": "58", "unit": "分钟"}, {"name": "消耗", "value": "约 360", "unit": "千卡"}],
-   "exercises": [{"name": "深蹲", "sets": "5 × 5", "weight": "80 kg", "delta": "+5 kg"}],
-   "week": {"done": [true, true, null, null, null, null, null], "plan": 4, "today": 1},
-   "diet": {"kcal": 1650, "kcal_goal": 1900, "macros": [...]},
-   "tomorrow": ...}
-  Leave out "diet" when there is no diet data that day; the block disappears.
+Fields for each kind and the rules are in SKILL.md, section 打卡卡片. After drawing, the script checks its own layout and
+prints "OK <out.png>" (send it as is), "WARN: …" (fix the JSON once) or exits with "NOT_ENOUGH_DATA: …" (reply in text).
 """
 import json
 import math
@@ -784,6 +733,28 @@ def daily_workout(spec):
     return im
 
 
+def layout_problems():
+    """Texts that overlap each other or a bar, or leave their tile or the card (the agent never has to look)."""
+    def hit(a, b):
+        return a[0] < b[2] - 1 and b[0] < a[2] - 1 and a[1] < b[3] - 1 and b[1] < a[3] - 1
+
+    def inside(a, b):
+        return a[0] >= b[0] - 1 and a[1] >= b[1] - 1 and a[2] <= b[2] + 1 and a[3] <= b[3] + 1
+
+    texts = [(b, t) for k, b, t in LAYOUT if k == "text"]
+    bars = [b for k, b, _ in LAYOUT if k == "bar"]
+    boxes = [b for k, b, _ in LAYOUT if k == "box"]
+    out = []
+    for i, (a, ta) in enumerate(texts):
+        if not inside(a, (0, 0, W, H)):
+            out.append("%s 超出卡片" % ta)
+        out += ["%s 和 %s 重叠" % (ta, tb) for b, tb in texts[i + 1:] if hit(a, b)]
+        out += ["%s 压到进度条" % ta for b in bars if hit(a, b)]
+        cx, cy = (a[0] + a[2]) / 2, (a[1] + a[3]) / 2
+        out += ["%s 超出小格" % ta for b in boxes if b[0] <= cx <= b[2] and b[1] <= cy <= b[3] and not inside(a, b)]
+    return out
+
+
 def main():
     if len(sys.argv) < 3 or sys.argv[1] not in KINDS:
         sys.exit(USAGE)
@@ -803,7 +774,8 @@ def main():
               "daily-timeline": daily_timeline, "daily-workout": daily_workout}[kind]
     del LAYOUT[:]
     render(clean(spec)).save(out, optimize=True)
-    print(out)
+    problems = layout_problems()
+    print("WARN: " + "; ".join(problems[:5]) if problems else "OK " + out)
 
 
 if __name__ == "__main__":

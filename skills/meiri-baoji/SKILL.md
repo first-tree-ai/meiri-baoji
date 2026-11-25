@@ -38,18 +38,40 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 
 本 Skill 只定义健康教练能力和决策规则，不定义渠道行为（回复节奏、消息长短与形式、开场方式、提醒时机、频率、定时任务）。需要跟进或周期复盘时，本 Skill 说明需要什么（内容、目的、大致频率，例如每周一次复盘）；是否安排、何时发、怎么发、与其他定时任务如何合并，都按当前渠道 prompt 处理。用户用了一两天后，按 `references/operations.md` 的「打卡提醒」主动问一次要不要饭点和睡前提醒；同意才设，不要就不再问；用户嫌烦或提醒后连续两天没回复，就停掉全部提醒、记进 playbook.md，不再主动恢复。
 
-## 打卡卡片的数据
+## 打卡卡片
 
-做打卡卡片或每日总结卡时（脚本 `scripts/checkin_card.py`，样式见 `templates/`），用户给的数据常常和模板对不上，按下面处理：
+用户打卡后可以做一张打卡卡片，每天可以做一张每日总结卡（样式见 `templates/`，不用打开看）。
 
-- 先从对话里把数据抽出来，只用用户说过、拍过或能合理估算的；没有的字段不传，对应的块自己消失。不要编数字凑满卡片。
-- 单位：热量一律写千卡（大卡、kcal、千焦都换算成千卡），重量写 kg，距离写公里。脚本也会把文字里的 kcal/kJ/磅/英里换算掉，但最好传之前就换好。
-- 模板没有槽位的数据（心率、配速、距离、体重、体脂、步频、补剂、单独记的饮料等）放进 `extras`；卡上会显示成一个“其他”小格，放不下的显示 +N。不重要的直接省略，在卡上那句话或文字回复里提一下就行。
-- 攀岩、跳绳、飞盘这类没有专门占位图的运动照样做训练卡，`sport` 写运动名，脚本会选最接近的占位图。
-- 数量超出：动作超过 5 个、餐次超过 4 餐、时间线超过 7 条时，脚本自动截断并显示 +N；不要为了塞下而合并或删掉用户的记录。
-- 超目标：照实传，进度块到 100% 封顶，数字照写；不评价“超标”。
-- 数据太少（比如只说“跑了 20 分钟”）就只做那一张最简单的卡，或者只用文字回复；只有喝水睡眠、没有饮食和训练时不做卡。
-- 脚本报 `NOT_ENOUGH_DATA` 时不出图，改用文字回复；不要补假数据让它出图。没有热量目标时每日总结只显示热量数字，不画仪表弧。
+**出卡步骤：** 一张卡就是一条命令。照下面的字段写 JSON，直接跑：
+
+```bash
+python3 scripts/checkin_card.py <kind> card.png - <<'JSON'
+{ ...对应 kind 的字段... }
+JSON
+```
+
+- 打印 `OK card.png`：直接把图发给用户。
+- 打印 `NOT_ENOUGH_DATA`：不出图，用文字回复；不要补假数据让它出图。
+- 打印 `WARN`：按提示改一次 JSON 重跑；还不行就照样发。
+- 不要读脚本源码，不要跑 --help 或 ls，不要先出测试图，不要打开模板图或成图检查：脚本自己检查排版，说 OK 就发。
+- `score` 只在今天已经算过分时填，不要为了出卡去算分或读 scoring.md。
+
+**字段**（只填用户说过、拍过或能合理估的；不知道就不写这个字段，对应的块会自动隐藏）：
+
+- **meal**（发了饭菜照片）：`photo` 照片路径，`label` 如“晚饭 · 一人份”，`dishes` 菜名用 · 隔开，`kcal` 范围如 "650-850"，`macros` {"protein","carb","fat"} 克数范围，`targets` 用户每天目标克数如 {"protein":150}，`line` 一句话，`extras`。
+- **workout**（一次训练）：`minutes`（必填），`sport` 写 strength/run/cycle/swim/yoga/hiit 或运动名（攀岩、跳绳等照写，脚本选最接近的占位图），`photo`（没有就不写，自动用占位图），`label`，`line`，`score`，`stats` [{"name":"消耗","value":"约 360","sub":"千卡"}]（最多 3 个），`exercises` [["深蹲","5×5 · 80kg"]]，`extras`。
+- **daily-nutrition**（饮食为主的一天）：`kcal`（必填），`kcal_goal`，`macros` [{"name":"蛋白质","value":128,"target":130}]，`meals` [{"photo","name":"早餐","time":"08:10","kcal":"150-170","desc":"燕麦奶"}]，`summary`，`activity` 一行小字，`score`，`delta` 如 "+6"，`tomorrow`，`extras`。
+- **daily-timeline**（饮食和运动都有的一天，至少 2 条）：`events` [{"time":"19:10","title":"腿日 · 58 分钟","sub":"深蹲 +5kg","photo":"可选","highlight":true}]，`summary`，`score`，`delta`，`kcal`，`kcal_goal`，`macros`，`tomorrow`，`extras`。
+- **daily-workout**（训练为主的一天）：`stats` [{"name":"时长","value":"58","unit":"分钟"}] 和 `exercises` [{"name":"深蹲","sets":"5 × 5","weight":"80 kg","delta":"+5 kg"}] 至少有一个，`sport`，`photo`，`label` 如“腿日 · 19:10”，`summary`，`score`，`week` {"done":[true,true,null,null,null,null,null],"plan":4,"today":2}，`diet` {"kcal","kcal_goal","macros"}（当天没有饮食数据就不写），`tomorrow`，`extras`。
+
+**数据对不上模板时：**
+
+- 热量一律写千卡，重量写 kg，距离写公里；kcal、大卡、千焦、磅、英里脚本会自动换算。
+- 模板没有的数据（心率、配速、体重、体脂、补剂、单独记的饮料……）放 `extras`，如 [{"name":"心率","value":"152","unit":"bpm"}]；不重要的直接省略。
+- 动作、餐次、事件太多时照实传，脚本会截断并显示 +N；不要合并或删掉用户的记录。
+- 超目标照实传，进度块到 100% 封顶；不评价“超标”。
+- 数据太少（比如只说“跑了 20 分钟”）就只做最简单的那张卡，或者只用文字回复；只有喝水、睡眠时不做卡。
+- `line` / `summary` / `tomorrow` 由你写：短，说今天具体发生的事，不说套话，不重复卡上已有的数字。用 \n 换行。
 
 ## 只服务这位用户
 
@@ -69,5 +91,4 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 | `baoji/leaderboard-state.json` | 有排行榜 membership 时，保存本地 membership 与按周期缓存的 definition；没有时不创建也不调用 MCP |
 | `baoji/goal-interview.md` | 还有没了解到的信息时 |
 | `references/apple-health.md` | 用户想接入苹果健康时 |
-| `scripts/checkin_card.py`、`scripts/nutrition_card.py`、`scripts/plan_card.py` | 要用图片呈现打卡、每日总结、营养估算或计划时，用法见 `references/operations.md` 的“图片” |
-| `templates/*.jpg` | 做饮食、运动打卡卡片或每日总结卡之前，看一眼对应的模板图；卡片用 `scripts/checkin_card.py` 生成 |
+| `scripts/nutrition_card.py`、`scripts/plan_card.py` | 要用图片呈现营养估算或计划时，用法见 `references/operations.md` 的“图片”；打卡卡片看上面的「打卡卡片」 |
