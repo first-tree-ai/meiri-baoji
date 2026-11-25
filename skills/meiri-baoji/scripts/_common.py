@@ -163,6 +163,9 @@ def read_spec(argv, usage):
         sys.exit("Invalid JSON spec: %s" % error)
 
 
+NO_LINE_START = "，。、！？；：,.!?;:）)】」』”’…%"
+
+
 def wrap(draw, text, font, width):
     """Wrap text (CJK or Latin) to lines no wider than width pixels."""
     lines, current = [], ""
@@ -171,7 +174,8 @@ def wrap(draw, text, font, width):
             lines.append(current)
             current = ""
             continue
-        if current and draw.textlength(current + char, font=font) > width:
+        # Closing punctuation never starts a line: let it hang at the end of the current one.
+        if current and char not in NO_LINE_START and draw.textlength(current + char, font=font) > width:
             lines.append(current)
             current = char
         else:

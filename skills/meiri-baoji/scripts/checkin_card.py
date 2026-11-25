@@ -158,7 +158,17 @@ def gauge(im, cx, cy, r, width, frac, sweep=240):
 
 
 def lines_of(d, text, font, width, limit):
-    return wrap(d, text, font, width)[:limit]
+    """At most limit lines; a cut-off text ends in "…" instead of stopping mid-sentence."""
+    lines = wrap(d, text, font, width)
+    # No one- or two-character widow on the last line: carry two characters down with it.
+    if len(lines) >= 2 and len(lines[-1]) <= 2 and len(lines[-2]) > 4 and "\n" not in str(text)[-4:]:
+        lines[-2], lines[-1] = lines[-2][:-2], lines[-2][-2:] + lines[-1]
+    if len(lines) <= limit:
+        return lines
+    last = lines[limit - 1]
+    while last and d.textlength(last + "…", font=font) > width:
+        last = last[:-1]
+    return lines[:limit - 1] + [last.rstrip("，、,;；") + "…"]
 
 
 # ---------- brand and shared blocks ----------
@@ -421,7 +431,8 @@ def workout(spec):
     if not spec.get("minutes"):
         sys.exit("NOT_ENOUGH_DATA: workout needs minutes; reply in text instead")
     photo = open_photo(spec["photo"]) if spec.get("photo") else placeholder(spec.get("sport"))
-    stats = spec.get("stats") or []
+    # The big number already shows the minutes, so a 时长 tile would only repeat it.
+    stats = [x for x in spec.get("stats") or [] if x.get("name") not in ("时长", "用时", "训练时长")]
     extras = [extra_text(dict(x, value="%s%s" % (x.get("value", ""), x.get("sub", "")))) for x in stats[3:]] \
         + list(spec.get("extras") or [])
     stats = stats[:3]
@@ -640,6 +651,8 @@ def daily_workout(spec):
         sys.exit("NOT_ENOUGH_DATA: daily-workout needs stats or exercises; reply in text instead")
     photo = open_photo(spec["photo"]) if spec.get("photo") else placeholder(spec.get("sport"))
     stats = spec.get("stats") or []
+    if spec.get("exercises"):  # the list header already says "N 个动作"
+        stats = [x for x in stats if x.get("name") not in ("动作", "动作数")]
     extras = [extra_text(dict(x, value="%s%s" % (x.get("value", ""), x.get("unit", "")))) for x in stats[3:]] \
         + list(spec.get("extras") or [])
     stats = stats[:3]
