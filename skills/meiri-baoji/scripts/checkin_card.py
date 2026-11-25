@@ -131,6 +131,76 @@ def thumb(im, photo, box, r=22):
     im.paste(cover(photo, x1 - x0, y1 - y0), (x0, y0), round_mask(x1 - x0, y1 - y0, r))
 
 
+ICON_WORDS = [("moon", ("夜宵", "睡", "晚安")), ("drop", ("喝水", "水 ")), ("dumbbell", ("练", "跑", "训练", "健身", "骑", "游", "瑜伽", "步")),
+              ("cup", ("早", "奶", "咖啡", "茶", "饮", "拿铁")), ("apple", ("加餐", "零食", "水果", "下午")),
+              ("bowl", ("午", "晚", "餐", "饭", "面"))]
+
+
+def icon_kind(text, default="bowl"):
+    text = str(text or "")
+    for kind, words in ICON_WORDS:
+        if any(w in text for w in words):
+            return kind
+    return default
+
+
+def icon(im, cx, cy, size, kind, color=TEAL):
+    """A simple line icon (bowl, cup, apple, moon, drop, dumbbell), drawn at 4x for smooth edges."""
+    s = 4
+    n = size * s
+    layer = Image.new("RGBA", (n, n), (0, 0, 0, 0))
+    g = ImageDraw.Draw(layer)
+    c = color + (255,)
+    w = max(2, n // 14)
+    if kind == "bowl":
+        g.pieslice((n * .1, n * .2, n * .9, n * .9), 0, 180, fill=c)
+        g.rectangle((n * .1, n * .52, n * .9, n * .57), fill=c)
+        g.line((n * .55, n * .08, n * .78, n * .5), fill=c, width=w)
+        g.line((n * .68, n * .05, n * .86, n * .48), fill=c, width=w)
+    elif kind == "cup":
+        g.rounded_rectangle((n * .15, n * .3, n * .68, n * .88), n // 10, fill=c)
+        g.arc((n * .55, n * .4, n * .9, n * .72), -90, 90, fill=c, width=w)
+        for x in (.3, .5):
+            g.arc((n * x - n * .06, n * .04, n * x + n * .06, n * .24), 90, 270, fill=c, width=w // 2 + 1)
+    elif kind == "apple":
+        g.ellipse((n * .14, n * .26, n * .86, n * .92), fill=c)
+        g.line((n * .5, n * .3, n * .52, n * .1), fill=c, width=w)
+        g.ellipse((n * .54, n * .06, n * .78, n * .2), fill=c)
+    elif kind == "moon":
+        g.ellipse((n * .12, n * .12, n * .88, n * .88), fill=c)
+        g.ellipse((n * .36, n * .02, n * 1.02, n * .7), fill=(0, 0, 0, 0))  # bite out a crescent
+    elif kind == "drop":
+        g.ellipse((n * .22, n * .38, n * .78, n * .94), fill=c)
+        g.polygon([(n * .5, n * .04), (n * .24, n * .58), (n * .76, n * .58)], fill=c)
+    else:  # dumbbell
+        g.rounded_rectangle((n * .08, n * .3, n * .24, n * .7), n // 20, fill=c)
+        g.rounded_rectangle((n * .76, n * .3, n * .92, n * .7), n // 20, fill=c)
+        g.rectangle((n * .24, n * .45, n * .76, n * .55), fill=c)
+    layer = layer.resize((size, size), Image.LANCZOS)
+    im.paste(layer, (int(cx - size / 2), int(cy - size / 2)), layer)
+
+
+def soft_teal():
+    return tuple(int(c * 0.12 + b * 0.88) for c, b in zip(TEAL, (255, 255, 255)))
+
+
+def meal_placeholder(im, d, box, name, desc, r=20):
+    """No photo: light teal tile with a meal icon and the dish (or meal name), so it sits well next to photos."""
+    x0, y0, x1, y1 = box
+    d.rounded_rectangle(box, r, fill=soft_teal())
+    w = x1 - x0
+    text = desc or name or ""
+    if w >= 300:  # wide tile: icon left, text right
+        icon(im, x0 + 60, (y0 + y1) // 2, 52, icon_kind(name or desc))
+        d.text((x0 + 104, (y0 + y1) // 2), fit(d, text, 26, w - 128, 20)[0], font=F(26), fill=T["accent_text"],
+               anchor="lm")
+    else:
+        icon(im, (x0 + x1) // 2, y0 + 50, 56, icon_kind(name or desc))
+        if text:
+            t, size = fit(d, text, 22, w - 20, 18)
+            d.text(((x0 + x1) // 2, y0 + 104), t, font=F(size), fill=T["accent_text"], anchor="mm")
+
+
 def ring(d, cx, cy, r, w, frac, color, track):
     d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=track, width=w)
     if frac > 0:
@@ -509,13 +579,11 @@ def daily_nutrition(spec):
     items = macro_items(spec.get("macros"))
     goal = spec.get("kcal_goal")
     meals = spec.get("meals") or []
-    photo_meals = any(m.get("photo") for m in meals)
     # Lay the blocks out first so a day with little data sits in the middle of the card, not at the top.
     n_lines = len(summary_lines(d, spec.get("summary"), 44, W - 96 - (220 if has_score else 0)))
     head_h = 230 if (has_score or activity) else (n_lines * 60 + 50 if n_lines else 0)
     card_h = (590 if items else 450) if goal else 230 + (TILE_H + 32 if items else 0)
-    list_rows = min(len(meals), 5) if len(meals) <= 5 else 5
-    meals_h = (28 + (308 if photo_meals else 84 + list_rows * 52 + 12)) if meals else 0
+    meals_h = (28 + 308) if meals else 0
     bottom = H - 150 if spec.get("tomorrow") else H - 48
     y0 = 140 + max(0, (bottom - 140 - head_h - card_h - meals_h) // 2)
     for i, ln in enumerate(summary_lines(d, spec.get("summary"), 44, W - 96 - (220 if has_score else 0))):
@@ -544,50 +612,33 @@ def daily_nutrition(spec):
         d.text((84 + d.textlength(kcal, font=F(size)) + 14, top + 190), "千卡", font=F(32), fill=T["sub"], anchor="ls")
     if items:
         nutrient_tiles(d, 80, W - 80, bot - TILE_H - 32, items, fill=T["inset"])
-    if meals and not photo_meals:  # no photos: a plain list, not grey blocks
-        rows = meals[:5] if len(meals) <= 5 else meals[:4]
-        top2 = bot + 28
-        bot2 = top2 + 84 + len(rows) * 52 + (52 if len(meals) > len(rows) else 0) + 12
-        d.rounded_rectangle((48, top2, W - 48, bot2), R, fill=T["tile"])
-        d.text((84, top2 + 28), "今日餐食", font=F(28), fill=T["ink"])
-        d.text((W - 84, top2 + 32), "%d 餐" % len(meals), font=F(24), fill=T["sub"], anchor="ra")
-        for i, m in enumerate(rows):
-            ry = top2 + 84 + i * 52 + 26
-            k = "约 %s 千卡" % bare(m["kcal"], "千卡").lstrip("约 ") if m.get("kcal") else ""
-            k = fit(d, k, 24, 300)[0] if k else ""
-            d.text((W - 84, ry), k, font=F(24), fill=T["sub"], anchor="rm")
-            label = " ".join(str(v) for v in (m.get("time"), m.get("name"), m.get("desc")) if v)
-            d.text((84, ry), fit(d, label, 26, W - 168 - d.textlength(k, font=F(24)) - 24)[0], font=F(26),
-                   fill=T["ink"], anchor="lm")
-        if len(meals) > len(rows):
-            d.text((84, top2 + 84 + len(rows) * 52 + 26), "+%d 餐" % (len(meals) - len(rows)), font=F(24),
-                   fill=T["sub"], anchor="lm")
-    elif meals:
+    if meals:
         top2, bot2 = bot + 28, bot + 336
         d.rounded_rectangle((48, top2, W - 48, bot2), R, fill=T["tile"])
         d.text((84, top2 + 28), "今日餐食", font=F(28), fill=T["ink"])
         d.text((W - 84, top2 + 32), "%d 餐" % len(meals), font=F(24), fill=T["sub"], anchor="ra")
+        # Up to 4 slots that always fill the row: 2 meals → halves, 3 → thirds; more than 4 → 3 meals + "+N".
         shown = meals[:4] if len(meals) <= 4 else meals[:3]
+        slots = len(shown) + (1 if len(meals) > 4 else 0)
         gap = 16
-        cw = (W - 168 - 3 * gap) // 4
-        if len(meals) > 4:
-            x, y = 84 + 3 * (cw + gap), top2 + 84
-            d.rounded_rectangle((x, y, x + cw, y + 130), 20, fill=T["inset"])
-            d.text((x + cw // 2, y + 65), "+%d" % (len(meals) - 3), font=F(40), fill=T["sub"], anchor="mm")
-            d.text((x, y + 142), "还有 %d 餐" % (len(meals) - 3), font=F(22), fill=T["ink"])
+        cw = (W - 168 - (slots - 1) * gap) // slots
+        y = top2 + 84
         for i, m in enumerate(shown):
-            x, y = 84 + i * (cw + gap), top2 + 84
+            x = 84 + i * (cw + gap)
             if m.get("photo"):
                 thumb(im, open_photo(m["photo"]), (x, y, x + cw, y + 130), 20)
             else:
-                d.rounded_rectangle((x, y, x + cw, y + 130), 20, fill=T["inset"])
-                d.text((x + cw // 2, y + 65), fit(d, m.get("name", ""), 30, cw - 20)[0], font=F(30), fill=T["sub"],
-                       anchor="mm")
+                meal_placeholder(im, d, (x, y, x + cw, y + 130), m.get("name"), m.get("desc"))
             label = " ".join(str(v) for v in (m.get("name"), m.get("time")) if v)
             d.text((x, y + 142), fit(d, label, 22, cw)[0], font=F(22), fill=T["ink"])
             if m.get("kcal"):
                 k, size = fit(d, "约 %s 千卡" % bare(m["kcal"], "千卡").lstrip("约 "), 20, cw, 16)
                 d.text((x, y + 172), k, font=F(size), fill=T["sub"])
+        if len(meals) > 4:
+            x = 84 + 3 * (cw + gap)
+            d.rounded_rectangle((x, y, x + cw, y + 130), 20, fill=soft_teal())
+            d.text((x + cw // 2, y + 65), "+%d" % (len(meals) - 3), font=F(44), fill=T["accent_text"], anchor="mm")
+            d.text((x, y + 142), "还有 %d 餐" % (len(meals) - 3), font=F(22), fill=T["ink"])
     tomorrow(d, spec.get("tomorrow"))
     return im
 
@@ -634,9 +685,14 @@ def daily_timeline(spec):
             d.text((48, yy + 4), tm, font=F(size), fill=T["sub"])
             d.ellipse((x_axis - 12, yy + 8, x_axis + 12, yy + 32), fill=TEAL if hl else T["ink"])
             tx = 210
+            disc = min(88, step - 8)
             if e.get("photo"):
-                thumb(im, open_photo(e["photo"]), (tx, yy - 10, tx + 88, yy + 78), 44)
-                tx += 112
+                thumb(im, open_photo(e["photo"]), (tx, yy - 10, tx + disc, yy - 10 + disc), disc // 2)
+            elif e.get("time") or e.get("sub"):
+                d.ellipse((tx, yy - 10, tx + disc, yy - 10 + disc), fill=soft_teal())
+                kind = "dumbbell" if hl else icon_kind(e.get("title"), "bowl")
+                icon(im, tx + disc // 2, yy - 10 + disc // 2, int(disc * 0.5), kind)
+            tx += disc + 24
             d.text((tx, yy - 4), fit(d, e.get("title", ""), 32, W - 48 - tx)[0], font=F(32),
                    fill=T["accent_text"] if hl else T["ink"])
             if e.get("sub"):
