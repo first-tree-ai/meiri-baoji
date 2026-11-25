@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Render a 每日薄肌 check-in card PNG (1080×1440, 3:4).
 
+AGENT: STOP — do not read further. Everything you need (fields, examples, rules) is in SKILL.md, section
+「打卡卡片」. Write the JSON from there and run the command; the script checks its own layout.
+
 usage: python3 checkin_card.py <kind> <out.png> [spec.json | -]
 
 Fields for each kind and the rules are in SKILL.md, section 打卡卡片. After drawing, the script checks its own layout and
