@@ -56,4 +56,5 @@ description: 每日薄肌：为一位用户提供饮食、运动、睡眠和补�
 | `baoji/leaderboard-state.json` | 有排行榜 membership 时，保存本地 membership 与按周期缓存的 definition；没有时不创建也不调用 MCP |
 | `baoji/goal-interview.md` | 还有没了解到的信息时 |
 | `references/apple-health.md` | 用户想接入苹果健康时 |
-| `scripts/nutrition_card.py`、`scripts/plan_card.py` | 要用图片呈现营养估算或计划时，用法见 `references/operations.md` 的“图片” |
+| `scripts/checkin_card.py`、`scripts/nutrition_card.py`、`scripts/plan_card.py` | 要用图片呈现打卡、每日总结、营养估算或计划时，用法见 `references/operations.md` 的“图片” |
+| `templates/*.jpg` | 做饮食、运动打卡卡片或每日总结卡之前，看一眼对应的模板图；卡片用 `scripts/checkin_card.py` 生成 |

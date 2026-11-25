@@ -1,0 +1,7 @@
+Placeholder photos for check-in cards when the user sent no photo (no people). Greyscale, long edge 900, recompressed.
+strength-1.jpg: "Trap bar with load", Wikimedia Commons, CC0.
+run-1.jpg: "Treadmills", Wikimedia Commons, CC0.
+cycle-1.jpg: "Bicycle (Unsplash).jpg", Wikimedia Commons, CC0, https://commons.wikimedia.org/wiki/File:Bicycle_(Unsplash).jpg
+swim-1.jpg: "Swimming pool underwater 1.JPG", Wikimedia Commons, Public domain, https://commons.wikimedia.org/wiki/File:Swimming_pool_underwater_1.JPG
+yoga-1.jpg: "Cotton Yoga Mats.png", Wikimedia Commons, CC0, https://commons.wikimedia.org/wiki/File:Cotton_Yoga_Mats.png
+hiit-1.jpg: "Exercise equipment (rubber ball, light-weight dumbbells, jump rope).jpg", Wikimedia Commons, Public domain, https://commons.wikimedia.org/wiki/File:Exercise_equipment_(rubber_ball,_light-weight_dumbbells,_jump_rope).jpg

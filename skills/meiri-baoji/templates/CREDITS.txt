@@ -1,0 +1,4 @@
+Example cards rendered by scripts/checkin_card.py (720×960 previews of the 1080×1440 output).
+Meal photos: the 每日薄肌 team's own photos.
+workout-photo.jpg, daily-workout.jpg background: "Fitness dumbbell marked with a green logo resting on a gym rack", Wikimedia Commons, CC BY 2.0.
+Other backgrounds: assets/placeholders (see assets/placeholders/CREDITS.txt).

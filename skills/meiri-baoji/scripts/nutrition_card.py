@@ -35,7 +35,7 @@ def main():
     d.rounded_rectangle((30, 30, W - 30, H - 30), 36, fill="#FFFFFF", outline="#F2D9C0", width=3)
     d.rounded_rectangle((30, 30, W - 30, 150), 36, fill="#FF8A4C")
     d.rectangle((30, 100, W - 30, 150), fill="#FF8A4C")
-    d.text((70, 62), "%s · 约 %s kcal" % (spec["meal"], spec["kcal"]), font=F(44), fill="white")
+    d.text((70, 62), "%s · 约 %s 千卡" % (spec["meal"], spec["kcal"]), font=F(44), fill="white")
 
     cells = [("蛋白质", "protein", "#E85D5D"), ("碳水", "carb", "#E0A526"), ("脂肪", "fat", "#4A9BD9"), ("纤维", "fiber", "#4CAF7A")]
     cw = (W - 140) // 4
