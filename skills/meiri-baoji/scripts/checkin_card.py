@@ -289,7 +289,7 @@ def tomorrow(d, text, y=H - 118):
     d.text((80, y + 32), text, font=F(size), fill=T["ink"], anchor="lm")
 
 
-TILE_H = 140
+TILE_H = 190
 
 
 def nutrient_tiles(d, x0, x1, y, items, h=TILE_H, fill=None):
@@ -302,23 +302,23 @@ def nutrient_tiles(d, x0, x1, y, items, h=TILE_H, fill=None):
         d.rounded_rectangle((x, y, x + cw, y + h), 22, fill=fill or T["tile"])
         mark("box", (x, y, x + cw, y + h))
         inner = cw - 44
-        d.text((x + 22, y + 18), fit(d, name, 22, inner)[0], font=F(22), fill=T["sub"])
+        d.text((x + 22, y + 20), fit(d, name, 22, inner)[0], font=F(22), fill=T["sub"])
         size = 36
         while size > 26 and d.textlength(value, font=F(size)) + 6 + d.textlength(rest, font=F(22)) > inner:
             size -= 2
         if d.textlength(value, font=F(size)) + 6 + d.textlength(rest, font=F(22)) > inner:
             rest = "g" if rest else rest
         value, size = fit(d, value, size, inner - (d.textlength(rest, font=F(22)) + 6 if rest else 0), 22)
-        base = y + 86
+        base = y + 122
         d.text((x + 22, base), value, font=F(size), fill=T["ink"], anchor="ls")
         if rest:
             d.text((x + 22 + d.textlength(value, font=F(size)) + 6, base), rest, font=F(22), fill=T["sub"], anchor="ls")
         if frac is not None:
-            by, bx1 = y + h - 34, x + cw - 22
-            d.rounded_rectangle((x + 22, by, bx1, by + 12), 6, fill=T["track"])
-            d.rounded_rectangle((x + 22, by, x + 22 + max(12, int((bx1 - x - 22) * max(0, min(frac, 1)))), by + 12),
-                                6, fill=TEAL)
-            mark("bar", (x + 22, by, bx1, by + 12))
+            by, bx1 = y + h - 38, x + cw - 22
+            d.rounded_rectangle((x + 22, by, bx1, by + 14), 7, fill=T["track"])
+            d.rounded_rectangle((x + 22, by, x + 22 + max(14, int((bx1 - x - 22) * max(0, min(frac, 1)))), by + 14),
+                                7, fill=TEAL)
+            mark("bar", (x + 22, by, bx1, by + 14))
 
 
 def macro_items(macros):
@@ -332,14 +332,14 @@ def macro_items(macros):
     return items[:3]
 
 
-def score_ring(d, cx, cy, score, label, r=82, on_photo=False):
+def score_ring(d, cx, cy, score, label, r=100, on_photo=False):
     if on_photo:
         d.ellipse((cx - r - 12, cy - r - 12, cx + r + 12, cy + r + 12), fill=(0, 0, 0))
     ring(d, cx, cy, r, 14, score / 100, TEAL, (70, 70, 70) if on_photo else T["track"])
     ink = (255, 255, 255) if on_photo else T["ink"]
     score, size = fit(d, score, 60, 2 * r - 44, 36)
-    d.text((cx, cy - 10), score, font=F(size), fill=ink, anchor="mm")
-    d.text((cx, cy + 34), fit(d, label, 20, 2 * r - 40)[0], font=F(20), fill=(190, 190, 190) if on_photo else T["sub"], anchor="mm")
+    d.text((cx, cy - 16), score, font=F(size), fill=ink, anchor="mm")
+    d.text((cx, cy + 44), fit(d, label, 20, 2 * r - 40)[0], font=F(20), fill=(190, 190, 190) if on_photo else T["sub"], anchor="mm")
 
 
 def photo_hero(photo, h, mono, focus=(0.5, 0.5)):
@@ -529,7 +529,7 @@ def workout(spec):
     d.text((48 + d.textlength(big, font=F(size)) + 16, hero_h - 54), "分钟", font=F(38), fill=(255, 255, 255),
            anchor="ls")
     if spec.get("score") is not None:
-        score_ring(d, W - 130, hero_h - 92, spec["score"], spec.get("score_label") or "运动分", r=68, on_photo=True)
+        score_ring(d, W - 150, hero_h - 118, spec["score"], spec.get("score_label") or "运动分", r=96, on_photo=True)
     y = hero_h + 30
     if stats:
         cw = (W - 96 - (len(stats) - 1) * 16) // len(stats)
@@ -582,8 +582,8 @@ def daily_nutrition(spec):
     # Lay the blocks out first so a day with little data sits in the middle of the card, not at the top.
     n_lines = len(summary_lines(d, spec.get("summary"), 44, W - 96 - (220 if has_score else 0)))
     head_h = 230 if (has_score or activity) else (n_lines * 60 + 50 if n_lines else 0)
-    card_h = (590 if items else 450) if goal else 230 + (TILE_H + 32 if items else 0)
-    meals_h = (28 + 308) if meals else 0
+    card_h = (600 if items else 450) if goal else 230 + (TILE_H + 32 if items else 0)
+    meals_h = (28 + 274) if meals else 0
     bottom = H - 150 if spec.get("tomorrow") else H - 48
     y0 = 140 + max(0, (bottom - 140 - head_h - card_h - meals_h) // 2)
     for i, ln in enumerate(summary_lines(d, spec.get("summary"), 44, W - 96 - (220 if has_score else 0))):
@@ -591,21 +591,21 @@ def daily_nutrition(spec):
     if activity:
         d.text((48, y0 + 142), fit(d, activity, 24, W - 340)[0], font=F(24), fill=T["sub"])
     if has_score:
-        cx, cy = W - 140, y0 + 80
+        cx, cy = W - 150, y0 + 86
         score_ring(d, cx, cy, spec["score"], "薄肌分")
         if spec.get("delta"):
-            d.text((cx, cy + 118), "比昨天 %s" % spec["delta"], font=F(24), fill=T["accent_text"], anchor="mm")
+            d.text((cx, cy + 128), "比昨天 %s" % spec["delta"], font=F(24), fill=T["accent_text"], anchor="mm")
     top = y0 + head_h
     bot = top + card_h  # the gauge needs a goal; without one the card shows just the number
     d.rounded_rectangle((48, top, W - 48, bot), R, fill=T["tile"])
     d.text((84, top + 30), "热量", font=F(28), fill=T["ink"])
     d.text((W - 84, top + 34), "今天", font=F(24), fill=T["sub"], anchor="ra")
     if goal:
-        gcx, gcy = W // 2, top + 290
-        gauge(im, gcx, gcy, 205, 48, spec["kcal"] / goal)
+        gcx, gcy = W // 2, top + 270
+        gauge(im, gcx, gcy, 185, 44, spec["kcal"] / goal)
         kcal, size = fit(d, spec["kcal"], 92, 300, 48)
         d.text((gcx, gcy - 24), kcal, font=F(size), fill=T["ink"], anchor="mm")
-        d.text((gcx, gcy + 42), fit(d, "目标 %s 千卡" % goal, 26, 300)[0], font=F(26), fill=T["sub"], anchor="mm")
+        d.text((gcx, gcy + 50), fit(d, "目标 %s 千卡" % goal, 26, 270)[0], font=F(26), fill=T["sub"], anchor="mm")
     else:
         kcal, size = fit(d, "约 %d" % spec["kcal"], 92, 600, 48)
         d.text((84, top + 190), kcal, font=F(size), fill=T["ink"], anchor="ls")
@@ -613,7 +613,7 @@ def daily_nutrition(spec):
     if items:
         nutrient_tiles(d, 80, W - 80, bot - TILE_H - 32, items, fill=T["inset"])
     if meals:
-        top2, bot2 = bot + 28, bot + 336
+        top2, bot2 = bot + 28, bot + 302
         d.rounded_rectangle((48, top2, W - 48, bot2), R, fill=T["tile"])
         d.text((84, top2 + 28), "今日餐食", font=F(28), fill=T["ink"])
         d.text((W - 84, top2 + 32), "%d 餐" % len(meals), font=F(24), fill=T["sub"], anchor="ra")
@@ -631,9 +631,6 @@ def daily_nutrition(spec):
                 meal_placeholder(im, d, (x, y, x + cw, y + 130), m.get("name"), m.get("desc"))
             label = " ".join(str(v) for v in (m.get("name"), m.get("time")) if v)
             d.text((x, y + 142), fit(d, label, 22, cw)[0], font=F(22), fill=T["ink"])
-            if m.get("kcal"):
-                k, size = fit(d, "约 %s 千卡" % bare(m["kcal"], "千卡").lstrip("约 "), 20, cw, 16)
-                d.text((x, y + 172), k, font=F(size), fill=T["sub"])
         if len(meals) > 4:
             x = 84 + 3 * (cw + gap)
             d.rounded_rectangle((x, y, x + cw, y + 130), 20, fill=soft_teal())
@@ -653,10 +650,8 @@ def daily_timeline(spec):
     header(im, d, "每日总结")
     tx0 = 48
     if spec.get("score") is not None:
-        ring(d, 140, 250, 86, 14, spec["score"] / 100, TEAL, T["track"])
-        d.text((140, 240), str(spec["score"]), font=F(64), fill=T["ink"], anchor="mm")
-        d.text((140, 284), "薄肌分", font=F(20), fill=T["sub"], anchor="mm")
-        tx0 = 270
+        score_ring(d, 148, 256, spec["score"], "薄肌分", r=104)
+        tx0 = 280
     for i, ln in enumerate(summary_lines(d, spec.get("summary"), 42, W - 48 - tx0)):
         d.text((tx0, 190 + i * 58), ln, font=F(42), fill=T["ink"])
     facts = []
@@ -737,7 +732,7 @@ def daily_workout(spec):
     if spec.get("label"):
         d.text((48, hero_h - 142 - (len(lines) - 1) * 68), spec["label"], font=F(28), fill=TEAL)
     if spec.get("score") is not None:
-        score_ring(d, W - 140, hero_h - 130, spec["score"], spec.get("score_label") or "运动分")
+        score_ring(d, W - 150, hero_h - 140, spec["score"], spec.get("score_label") or "运动分")
     y = hero_h + 10
     if stats:
         cw = (W - 96 - (len(stats) - 1) * 16) // len(stats)
@@ -806,13 +801,13 @@ def daily_workout(spec):
 
 
 # Cards are read on a phone at about a third of their 1080 px width, so small text is raised to stay legible
-# (28 px on the card ≈ 10 pt on screen). Larger sizes keep their hierarchy.
-PHONE_MIN = {20: 28, 22: 28, 24: 30, 26: 30, 28: 32, 30: 34, 32: 34}
+# (a 1080 px card opened full-screen is ~390 pt wide: 38 px ≈ 14 pt, the smallest text we allow). Larger sizes keep their hierarchy.
+PHONE_MIN = {20: 38, 22: 38, 24: 38, 26: 40, 28: 44, 30: 44, 32: 46, 36: 48, 38: 48, 40: 52, 42: 52, 44: 54, 52: 60, 54: 60, 60: 68, 64: 72}
 
 
 def phone_fonts(load):
     def F(size):
-        return load(PHONE_MIN.get(size, max(size, 28)))
+        return load(PHONE_MIN.get(size, max(size, 38)))
 
     return F
 
