@@ -722,7 +722,7 @@ def daily_workout(spec):
     diet_items = macro_items(diet.get("macros")) if diet else []
     fixed = (174 if stats else 0) + (EXTRAS_H if extras else 0) + (150 if week else 0) \
         + (52 + TILE_H + 22 if diet and diet_items else 0) + (150 if spec.get("tomorrow") else 40)
-    while shown and H - fixed - (92 + len(shown) * 60 + 40) < 460 and len(shown) > 2:
+    while shown and H - fixed - (92 + len(shown) * 60 + 40) < 380 and len(shown) > 2:
         shown = shown[:len(shown) - 2] + [{"name": "+%d 个动作" % (len(exercises) - len(shown) + 2)}]
     ex_h = 92 + len(shown) * 60 + 16 if shown else 0
     hero_h = H - fixed - (ex_h + 24 if shown else 0)
@@ -805,6 +805,18 @@ def daily_workout(spec):
     return im
 
 
+# Cards are read on a phone at about a third of their 1080 px width, so small text is raised to stay legible
+# (28 px on the card ≈ 10 pt on screen). Larger sizes keep their hierarchy.
+PHONE_MIN = {20: 28, 22: 28, 24: 30, 26: 30, 28: 32, 30: 34, 32: 34}
+
+
+def phone_fonts(load):
+    def F(size):
+        return load(PHONE_MIN.get(size, max(size, 28)))
+
+    return F
+
+
 def layout_problems():
     """Texts that overlap each other or a bar, or leave their tile or the card (the agent never has to look)."""
     def hit(a, b):
@@ -841,7 +853,7 @@ def main():
     global Image, ImageDraw, ImageFont, F
     from PIL import Image, ImageDraw, ImageFont  # noqa: F811
 
-    F = font_loader()
+    F = phone_fonts(font_loader())
     render = {"meal": meal, "workout": workout, "daily-nutrition": daily_nutrition,
               "daily-timeline": daily_timeline, "daily-workout": daily_workout}[kind]
     del LAYOUT[:]
