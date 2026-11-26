@@ -82,15 +82,15 @@ JSON
 
 - **meal**（发了饭菜照片）：`photo` 照片路径，`label` 如“晚饭 · 一人份”，`dishes` 菜名用 · 隔开，`kcal` 范围如 "650-850"，`macros` {"protein","carb","fat"} 克数范围，`targets` 用户每天目标克数如 {"protein":150}，`line` 一句话，`extras`。
 - **workout**（一次训练）：`minutes`（必填），`sport` 写 strength/run/cycle/swim/yoga/hiit 或运动名（攀岩、跳绳等照写，脚本选最接近的占位图），`photo`（没有就不写，自动用占位图），`label`，`line`，`score`，`stats` [{"name":"消耗","value":"约 360","sub":"千卡"}]（最多 3 个），`exercises` [["深蹲","5×5 · 80kg"]]，`extras`。
-- **daily-nutrition**（饮食为主的一天）：`kcal`（必填），`kcal_goal`，`macros` [{"name":"蛋白质","value":128,"target":130}]，`meals` [{"photo","name":"早餐","time":"08:10","kcal":"150-170","desc":"燕麦奶"}]，`summary`，`activity` 一行小字，`score`，`delta` 如 "+6"，`tomorrow`，`extras`。
-- **daily-timeline**（饮食和运动都有的一天，至少 2 条）：`events` [{"time":"19:10","title":"腿日 · 58 分钟","sub":"深蹲 +5kg","photo":"可选","highlight":true}]，`summary`，`score`，`delta`，`kcal`，`kcal_goal`，`macros`，`tomorrow`，`extras`。
-- **daily-workout**（训练为主的一天）：`stats` [{"name":"时长","value":"58","unit":"分钟"}] 和 `exercises` [{"name":"深蹲","sets":"5 × 5","weight":"80 kg","delta":"+5 kg"}] 至少有一个，`sport`，`photo`，`label` 如“腿日 · 19:10”，`summary`，`score`，`week` {"done":[true,true,null,null,null,null,null],"plan":4,"today":2}，`diet` {"kcal","kcal_goal","macros"}（当天没有饮食数据就不写），`tomorrow`，`extras`。
+- **daily-nutrition**（饮食为主的一天）：`kcal`（必填），`kcal_goal`，`macros` [{"name":"蛋白质","value":128,"target":130}]，`summary`，`score`，`tomorrow`。每餐已经各有餐卡，这张不再列餐食。
+- **daily-timeline**（饮食和运动都有的一天，至少 2 条）：`events` [{"time":"19:10","title":"腿日 · 58 分钟","photo":"可选","highlight":true}]（只显示标题，最多 5 行，多的显示“还有 N 项”），`summary`，`score`，`macros`，`tomorrow`。
+- **daily-workout**（训练为主的一天）：`stats` [{"name":"时长","value":"58","unit":"分钟"}]（最多 3 个），`sport`，`photo`，`label` 如“腿日 · 19:10”，`summary`，`score`，`week` {"done":[true,true,null,null,null,null,null],"plan":4,"today":2}，`tomorrow`。动作清单在训练卡上，这张不再列。
 
 **数据对不上模板时：**
 
 - 热量一律写千卡，重量写 kg，距离写公里；kcal、大卡、千焦、磅、英里脚本会自动换算。
-- 模板没有的数据（心率、配速、体重、体脂、补剂、单独记的饮料……）放 `extras`，如 [{"name":"心率","value":"152","unit":"bpm"}]；不重要的直接省略。
-- 动作、餐次、事件太多时照实传，脚本会截断并显示 +N；不要合并或删掉用户的记录。
+- 卡片只放最重要的几项，字要大、留白要够。模板没有的数据（心率、配速、体重、补剂……）不上卡，需要的话在点评里提一句。
+- 动作、事件太多时照实传，脚本只显示前几项并写“+N”；不要合并或删掉用户的记录。
 - 超目标照实传，进度块到 100% 封顶；不评价“超标”。
 - 数据太少（比如只说“跑了 20 分钟”）就只做最简单的那张卡，或者只用文字回复；只有喝水、睡眠时不做卡。
 - `line` / `summary` / `tomorrow` 由你写：短，说今天具体发生的事，不说套话，不重复卡上已有的数字。用 \n 换行。
