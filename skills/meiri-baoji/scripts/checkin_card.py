@@ -237,6 +237,40 @@ def load_photos(spec):
     return out
 
 
+# Default images (assets/placeholders/<group>-<n>.jpg) when the user sent no photo: by sport or meal, else a
+# neutral background. Which one rotates by date, so the same card type looks different from day to day.
+SPORT_GROUPS = {"strength": "strength", "力量": "strength", "攀岩": "strength", "climb": "strength", "run": "run",
+                "跑步": "run", "飞盘": "run", "frisbee": "run", "ball": "run", "篮球": "run", "足球": "run",
+                "羽毛球": "run", "网球": "run", "cycle": "cycle", "骑行": "cycle", "单车": "cycle", "row": "cycle",
+                "划船": "cycle", "swim": "swim", "游泳": "swim", "yoga": "yoga", "瑜伽": "yoga", "pilates": "yoga",
+                "普拉提": "yoga", "stretch": "yoga", "拉伸": "yoga", "hiit": "hiit", "跳绳": "hiit", "jump rope": "hiit",
+                "crossfit": "hiit", "walk": "walk", "步行": "walk", "散步": "walk", "hike": "walk", "徒步": "walk",
+                "爬山": "walk"}
+MEAL_GROUPS = (("breakfast", ("早",)), ("lunch", ("午",)), ("dinner", ("晚", "夜宵")),
+               ("snack", ("加餐", "零食", "水果", "下午茶", "奶茶", "饮")))
+
+
+def default_photos(kind, spec):
+    folder = os.path.join(ASSETS, "placeholders")
+    if not os.path.isdir(folder):
+        return []
+    if kind == "workout":
+        sport = str(spec.get("sport") or spec.get("label") or "").strip().lower()
+        group = SPORT_GROUPS.get(sport) or next((g for k, g in SPORT_GROUPS.items() if k in sport), "strength")
+        groups = [group]
+    elif kind == "meal":
+        text = "%s %s" % (spec.get("label") or "", spec.get("dishes") or "")
+        groups = [g for g, words in MEAL_GROUPS if any(w in text for w in words)][:1] + ["plate"]
+    else:
+        groups = ["bg"]
+    names = sorted(n for n in os.listdir(folder) for g in groups if n.startswith(g + "-") and n.endswith(".jpg"))
+    if not names:
+        return []
+    day = datetime.date.today().toordinal() + KINDS.index(kind) * 3
+    img = open_photo(os.path.join(folder, names[day % len(names)]))
+    return [(img,) + look(img)] if img is not None else []
+
+
 def tile_boxes(box, n, gap):
     """1 fills the box; 2 side by side (or stacked in a wide-short… tall box); 3 = one big + two; 4 = 2×2."""
     x0, y0, x1, y1 = box
@@ -382,7 +416,7 @@ def need(cond, msg):
 
 def story_meal(spec):
     photos = load_photos(spec)
-    need(photos, "meal needs at least one photo")
+    need(photos or spec.get("kcal") or spec.get("dishes"), "meal needs a photo, kcal or dishes")
     kcal = shown(spec.get("kcal"), "千卡")
     m, tg = spec.get("macros") or {}, spec.get("targets") or {}
     if isinstance(m, list):  # [{"name","value","target"}] also works
@@ -1039,6 +1073,8 @@ def render(kind, spec):
     kind = KIND_ALIASES.get(kind, kind)
     st = STORIES[kind](spec)
     st["kind"] = kind
+    if not st.get("photos"):
+        st["photos"] = default_photos(kind, spec)
     style = STYLES.get(str(spec.get("style") or "A").strip().lower(), "A")
     return STYLE_FN[style](st)
 
