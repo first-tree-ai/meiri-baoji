@@ -636,10 +636,11 @@ def style_a(st):
     top = 150
     if photos:
         bs = 300 if len(big) <= 3 else 220
-        collage(im, (0, 0, W, H), photos, gap=8)
-        shade_top(im)
         need_h = mid_height(bs, hs, len(hl))
         top = max(int(H * 0.4), panel_top - 40 - need_h)
+        # one photo fills the card; several photos stop where the text starts, so no tile (or "+N") sits under it
+        collage(im, (0, 0, W, H if len(photos) == 1 else top + 20), photos, gap=8)
+        shade_top(im)
         if hero or head or sub or week or panel_h:
             fade(im, top - 260, top + 60, 236)
     else:
@@ -659,6 +660,10 @@ def style_a(st):
         else:
             hs -= 4
             hl = lines_of(d, head, hs, W - 128, 3)
+    if mid_height(bs, hs, len(hl)) > avail:
+        week = None
+    if mid_height(bs, hs, len(hl)) > avail:
+        sub = ""
     txt(d, (64, 86), fit(d, st.get("kicker", ""), 40, W - 520)[0], 40, kick_ink, "lm", bold=bool(photos))
     brand_chip(im, W - 56, 56)
     spare = max(0, avail - mid_height(bs, hs, len(hl)))
