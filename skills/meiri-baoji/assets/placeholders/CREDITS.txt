@@ -13,4 +13,3 @@ breakfast-1.jpg: "Baozi as a fast food(2026, Shandong).jpg", Cartonfox, CC0, htt
 lunch-1.jpg: "MyPlate gov Cultural Food (20241025-USDA-FNS-UNK-0083) (cropped).jpg", USDAgov, Public domain, https://commons.wikimedia.org/wiki/File:MyPlate_gov_Cultural_Food_(20241025-USDA-FNS-UNK-0083)_(cropped).jpg
 dinner-1.jpg: "Yasai-itame 001.jpg", Ocdp, CC0, https://commons.wikimedia.org/wiki/File:Yasai-itame_001.jpg
 snack-1.jpg: "Fruit Platter (Unsplash).jpg", Cecilia Par famla_fint, CC0, https://commons.wikimedia.org/wiki/File:Fruit_Platter_(Unsplash).jpg
-bg-1.jpg: "Weatherworn top of wooden table.jpg", W.carter, CC0, https://commons.wikimedia.org/wiki/File:Weatherworn_top_of_wooden_table.jpg

@@ -238,7 +238,7 @@ def load_photos(spec):
 
 
 # Default images (assets/placeholders/<group>-<n>.jpg) when the user sent no photo: by sport or meal, else a
-# neutral background. Which one rotates by date, so the same card type looks different from day to day.
+# sport photo for daily / weekly. Which one rotates by date, so the same card type looks different from day to day.
 SPORT_GROUPS = {"strength": "strength", "力量": "strength", "攀岩": "strength", "climb": "strength", "run": "run",
                 "跑步": "run", "飞盘": "run", "frisbee": "run", "ball": "run", "篮球": "run", "足球": "run",
                 "羽毛球": "run", "网球": "run", "cycle": "cycle", "骑行": "cycle", "单车": "cycle", "row": "cycle",
@@ -261,8 +261,13 @@ def default_photos(kind, spec):
     elif kind == "meal":
         text = "%s %s" % (spec.get("label") or "", spec.get("dishes") or "")
         groups = [g for g, words in MEAL_GROUPS if any(w in text for w in words)][:1] or [g for g, _ in MEAL_GROUPS]
-    else:
-        groups = ["bg"]
+    else:  # daily / weekly: a sport photo for the day's or week's main activity, else rotate through the sports
+        acts = [w for w in spec.get("workouts") or [] if isinstance(w, dict)]
+        acts.sort(key=lambda w: -(number(w.get("minutes")) or 0))
+        text = " ".join(str(x) for x in [spec.get("sport")] + [w.get("sport") or w.get("name") for w in acts] if x)
+        text = text.strip().lower()
+        hit = next((g for k, g in SPORT_GROUPS.items() if k in text), None) if text else None
+        groups = [hit] if hit else sorted(set(SPORT_GROUPS.values()))
     names = sorted(n for n in os.listdir(folder) for g in groups if n.startswith(g + "-") and n.endswith(".jpg"))
     if not names:
         return []
@@ -1081,7 +1086,7 @@ def render(kind, spec):
     if not st.get("photos"):
         if kind in ("meal", "workout"):
             st["photos"] = default_photos(kind, spec)
-        elif style == "A":  # daily / weekly: a quiet backdrop behind the big type, not a photo slot
+        elif style == "A":  # daily / weekly: a sport photo behind the big type, not a photo slot
             st["backdrop"] = default_photos(kind, spec)
     return STYLE_FN[style](st)
 
