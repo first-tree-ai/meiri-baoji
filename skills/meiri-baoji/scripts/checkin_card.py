@@ -96,8 +96,10 @@ def txt(d, xy, text, size, fill, anchor="la", bold=False):
     return tw(d, text, size)
 
 
-def fit(d, text, size, width, min_size=MIN_PX):
+def fit(d, text, size, width, min_size=None):
+    """Shrink to min_size (default: no shrinking), then cut with "…"."""
     text = str(text)
+    min_size = min_size or size
     while size > min_size and tw(d, text, size) > width:
         size -= 2
     if tw(d, text, size) > width:
@@ -127,7 +129,7 @@ def wrap(d, text, font, width):
 def lines_of(d, text, size, width, limit):
     """At most limit lines; a cut-off text ends in "…" instead of stopping mid-sentence."""
     font = F(size)
-    lines = wrap(d, text, font, width)
+    lines = wrap(d, text, font, width - size)  # room for a comma hanging at the line end
     # No one- or two-character widow on the last line: carry two characters down with it.
     if (len(lines) >= 2 and len(lines[-1]) <= 2 and len(lines[-2]) > 4 and "\n" not in str(text)[-4:]
             and not re.search(r"[0-9A-Za-z]", lines[-2][-3:])):
@@ -436,7 +438,7 @@ def story_workout(spec):
 
 def date_parts(spec):
     raw = str(spec.get("date") or "")
-    m = re.search(r"(\d{1,2})\s*[月./-]\s*(\d{1,2})", raw)
+    m = re.search(r"(?:\d{4}\s*[年./-]\s*)?(\d{1,2})\s*[月./-]\s*(\d{1,2})", raw)
     today = datetime.date.today()
     if m:
         mon, day = int(m.group(1)), int(m.group(2))
@@ -574,7 +576,7 @@ def value_unit(d, x, base, v, unit, size, width, ink, unit_ink, min_size=46):
     """A big value with its unit in small type after it; the value shrinks first, then the unit goes."""
     uw = tw(d, unit, 40) + 10 if unit else 0
     v, vs = fit(d, v, size, width - uw, min_size)
-    if unit and tw(d, v, vs) + uw > width:
+    if unit and (tw(d, v, vs) + uw > width or v.endswith("…")):
         unit, uw = "", 0
         v, vs = fit(d, v, size, width, min_size)
     w = txt(d, (x, base), v, vs, ink, "ls", bold=True)
@@ -622,7 +624,8 @@ def style_a(st):
     if photos:
         bs = 200
         need_h = mid_height(bs, hs, len(hl))
-        ph = int(min(max(panel_top - 50 - need_h - 40, 480), 860))
+        empty = not (hero or head or sub or week or panel_h)
+        ph = H if empty else int(min(max(panel_top - 50 - need_h - 40, 480), 860))
         collage(im, (0, 0, W, ph), photos, gap=8)
         shade_top(im)
         top = ph + 40
@@ -693,7 +696,7 @@ def style_a(st):
         if facts:
             d.line((80, ty, W - 80, ty), fill=(60, 66, 68), width=3)
         t = "%s · %s" % foot
-        txt(d, (88, ty + 56), fit(d, t, 46, W - 176, 40)[0], 46, (232, 232, 232), "lm")
+        txt(d, (88, ty + 56), fit(d, t, 46, W - 176)[0], 46, (232, 232, 232), "lm")
     return im
 
 
@@ -757,7 +760,8 @@ def style_b(st):
         bs -= 10
     if not photos and spare > 300:
         cover = True
-        grow = min(int(spare * 0.85), 480) if not (head or rows_shown) else min(int(spare * 0.4), 160)
+        lines = len(rows_shown) + (1 if hidden else 0) + (2 if head else 0)
+        grow = min(int(spare * (0.85 if not lines else 0.6 if lines <= 2 else 0.4)), 480 if lines <= 2 else 160)
         bs = 260 + grow
         while bs > 200 and tw(d, big, bs) > W - 112:
             bs -= 10
@@ -839,7 +843,7 @@ def style_b(st):
     if foot:
         d.rectangle((0, H - 150, W, H), fill=INK)
         t = "%s → %s" % foot
-        txt(d, (56, H - 75), fit(d, t, 48, W - 112, 40)[0], 48, WHITE, "lm")
+        txt(d, (56, H - 75), fit(d, t, 48, W - 112)[0], 48, WHITE, "lm")
     return im
 
 
@@ -867,6 +871,12 @@ def style_c(st):
     lst = st.get("list") or []
     week = st.get("week")
     note = [x for x in (st.get("head"), "%s · %s" % st["foot"] if st.get("foot") else "") if x]
+    parts = []  # (line, size, bold) for the teal note tile
+    for i, t in enumerate(note):
+        first = i == 0 and bool(st.get("head"))
+        size = (64 if len(note) == 1 else 52) if first else 44
+        parts += [(ln, size, first) for ln in lines_of(d, t, size, x1 - x0 - 88, 2 if first else 1)]
+    note_h = sum(p[1] + 26 for p in parts) + 50
     photos = st.get("photos")
     rows = []  # (name, base height, minimum)
     if photos:
@@ -882,7 +892,7 @@ def style_c(st):
     if week:
         rows.append(("week", 230, 200))
     if note:
-        rows.append(("note", 90 + 80 * len(note), 70 + 76 * len(note)))
+        rows.append(("note", note_h + 40, note_h))
     drop = ["list", "facts", "week", "bars"]
     while sum(r[2] for r in rows) + G * (len(rows) - 1) > bottom - top and drop:
         name = drop.pop(0)
@@ -933,7 +943,7 @@ def style_c(st):
                 r = min((x1 - rx0) / 2 - 50, (h - 110) / 2)
                 cy = y + 30 + r + 10
                 ring(d, cx, cy, r, 34, ring_[0] / 100, TEAL, TRACK)
-                sc, ss = fit(d, shown(ring_[0]), int(r * 0.85), r * 1.4, 60)
+                sc, ss = fit(d, shown(ring_[0]), int(r * 0.75), r * 1.25, 60)
                 txt(d, (cx, cy), sc, ss, WHITE, "mm", bold=True)
                 txt(d, (cx, y + h - 44), fit(d, ring_[1], 40, x1 - rx0 - 40)[0], 40, TEAL, "mm")
         elif name in ("bars", "facts"):
@@ -994,11 +1004,6 @@ def style_c(st):
                           r=min(48, int((h - 120) / 2)))
         else:  # note: the sentence (and tomorrow / next week) on a teal tile
             tile(d, b, fill=TEAL)
-            parts = []
-            for i, t in enumerate(note):
-                size = (64 if len(note) == 1 else 52) if i == 0 and st.get("head") else 44
-                for ln in lines_of(d, t, size, x1 - x0 - 88, 2 if i == 0 else 1):
-                    parts.append((ln, size, i == 0 and bool(st.get("head"))))
             lh = [p[1] + 26 for p in parts]
             ly = y + (h - sum(lh)) / 2
             for (t, size, bold), step in zip(parts, lh):
