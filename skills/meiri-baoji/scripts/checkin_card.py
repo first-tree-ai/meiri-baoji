@@ -593,8 +593,21 @@ def pill(d, x, base, text, size, fill, ink):
 
 # ---------- style A: poster on a solid teal field ----------
 
+A_BG = (22, 24, 26)
+A_PANEL = (40, 43, 46)
+
+
+def fade(im, y0, y1, alpha):
+    """Darken the photo from y0 (clear) to y1 (alpha), solid below, so white type stays readable."""
+    g = Image.new("L", (1, H), 0)
+    for y in range(H):
+        g.putpixel((0, y), 0 if y < y0 else int(alpha * min(1, (y - y0) / max(1, y1 - y0))))
+    im.paste(Image.new("RGB", (W, H), A_BG), (0, 0), g.resize((W, H)))
+
+
 def style_a(st):
-    im = Image.new("RGB", (W, H), TEAL)
+    """Big-type poster: the photo fills the card (darkened at the bottom) or a near-black page; teal only for accents."""
+    im = Image.new("RGB", (W, H), A_BG)
     d = draw(im)
     photos = st.get("photos")
     facts = st.get("facts_ab") or st.get("facts") or []
@@ -622,17 +635,16 @@ def style_a(st):
     hl = lines_of(d, head, hs, W - 128, 3) if head else []
     top = 150
     if photos:
-        bs = 200
-        need_h = mid_height(bs, hs, len(hl))
-        empty = not (hero or head or sub or week or panel_h)
-        ph = H if empty else int(min(max(panel_top - 50 - need_h - 40, 480), 860))
-        collage(im, (0, 0, W, ph), photos, gap=8)
+        bs = 300 if len(big) <= 3 else 220
+        collage(im, (0, 0, W, H), photos, gap=8)
         shade_top(im)
-        top = ph + 40
-        kick_ink = WHITE
+        need_h = mid_height(bs, hs, len(hl))
+        top = max(int(H * 0.4), panel_top - 40 - need_h)
+        if hero or head or sub or week or panel_h:
+            fade(im, top - 260, top + 60, 236)
     else:
-        kick_ink = INK
         bs = 460 if len(big) <= 2 else 380 if len(big) <= 3 else 300
+    kick_ink = WHITE
     # the hero shrinks to fit the width; spare height goes to a bigger headline
     room = W - 120 - (tw(d, unit, 64) + 30 if unit else 0) - (tw(d, pill_text, 64) + 100 if pill_text else 0)
     while big and bs > 120 and tw(d, big, bs) + bs // 18 > room:
@@ -649,30 +661,31 @@ def style_a(st):
             hl = lines_of(d, head, hs, W - 128, 3)
     txt(d, (64, 86), fit(d, st.get("kicker", ""), 40, W - 520)[0], 40, kick_ink, "lm", bold=bool(photos))
     brand_chip(im, W - 56, 56)
-    y = top + max(0, (avail - mid_height(bs, hs, len(hl))) / 2)
+    spare = max(0, avail - mid_height(bs, hs, len(hl)))
+    y = top + (spare if photos else spare / 2)  # on a photo the text sits low, over the darkened part
     if label:
-        txt(d, (64, y + 24), label, 48, DEEP, "lm")
+        txt(d, (64, y + 24), label, 48, TEAL, "lm")
         y += 60
     if big:
         base = y + 20 - d.textbbox((0, 0), big, font=F(bs), anchor="ls")[1]  # digit tops differ per font
-        w = txt(d, (52, base), big, bs, INK, "ls", bold=True)
+        w = txt(d, (52, base), big, bs, WHITE, "ls", bold=True)
         x = 52 + w + 28
         if unit:
-            x += txt(d, (x, base - 8), unit, 64, INK, "ls", bold=True) + 24
+            x += txt(d, (x, base - 8), unit, 64, WHITE, "ls", bold=True) + 24
         if pill_text:
-            pill(d, x, base - 8, pill_text, 64 if not photos else 52, INK, TEAL)
+            pill(d, x, base - 8, pill_text, 64 if not photos else 52, TEAL, INK)
         y = base + 60
     for line in hl:
-        txt(d, (64, y + hs * 0.5), line, hs, INK, "lm", bold=True)
+        txt(d, (64, y + hs * 0.5), line, hs, WHITE, "lm", bold=True)
         y += hs + 22
     if sub:
-        txt(d, (64, y + 30), fit(d, sub, 44, W - 128)[0], 44, DEEP, "lm")
+        txt(d, (64, y + 30), fit(d, sub, 44, W - 128)[0], 44, GREY, "lm")
         y += 64
     if week:
-        week_dots(d, 40, W - 40, y + 70, week.get("done"), INK, DEEP, TEAL, DEEP, r=42)
+        week_dots(d, 40, W - 40, y + 70, week.get("done"), TEAL, (110, 112, 114), INK, GREY, r=42)
     if not panel_h:
         return im
-    d.rounded_rectangle((32, panel_top, W - 32, H - 32), 44, fill=INK)
+    d.rounded_rectangle((32, panel_top, W - 32, H - 32), 44, fill=A_PANEL)
     mark("box", (32, panel_top, W - 32, H - 32))
     ty = panel_top + 40
     if len(facts) == 1:
@@ -1003,11 +1016,12 @@ def style_c(st):
                 week_dots(d, x0 + 20, x1 - 20, y + 100 + (h - 100) / 2, done, TEAL, TRACK, DARK, GREY,
                           r=min(48, int((h - 120) / 2)))
         else:  # note: the sentence (and tomorrow / next week) on a teal tile
-            tile(d, b, fill=TEAL)
+            tile(d, b)
+            d.rounded_rectangle((x0, y + 24, x0 + 10, y + h - 24), 5, fill=TEAL)
             lh = [p[1] + 26 for p in parts]
             ly = y + (h - sum(lh)) / 2
             for (t, size, bold), step in zip(parts, lh):
-                txt(d, (x0 + 44, ly + step / 2), t, size, INK, "lm", bold=bold)
+                txt(d, (x0 + 44, ly + step / 2), t, size, WHITE if bold else (200, 200, 200), "lm", bold=bold)
                 ly += step
         y += h + G
     return im
