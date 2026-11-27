@@ -942,6 +942,84 @@ def style_b_meal(st):
     return im
 
 
+def style_b_menu(st):
+    """Cream meal page for 2+ dishes, laid out like a menu: the photo on the left, the dishes stacked on the right
+    (amount in grey under each name), the sentence under them; one row of same-size numbers at the bottom."""
+    im = Image.new("RGB", (W, H), CREAM)
+    d = draw(im)
+    big, s1, s2 = st["mast"]
+    brand_chip(im, W - 56, 48)
+    bs = 104
+    while bs > 60 and tw(d, big, bs) > 420:
+        bs -= 8
+    w = txt(d, (56, 150), big, bs, TEAL, "ls", bold=True)
+    tail = " · ".join(x for x in (s1, s2) if x)
+    txt(d, (56 + w + 24, 150), fit(d, tail, 44, W - 112 - w - 24)[0], 44, INK, "ls")
+    d.rectangle((56, 177, W - 56, 179), fill=INK)
+    facts = [(st["hero"][1], "热量", "千卡")] + [f for f in st.get("facts") or [] if f[0]][:3]
+    fh = 190
+    top, bottom = 220, H - 40 - fh - 30
+    px1 = 560
+    collage(im, (56, top, px1, bottom), st["photos"], r=10, gap=10, plus_top=True)
+    # the menu column
+    x0, cw = px1 + 44, W - 56 - (px1 + 44)
+    dishes = []
+    for name, _ in st.get("rows") or []:
+        m = re.match(r"^(.*\S)\s+(\S+)$", name)
+        amount = m.group(2) if m and PORTION.match(m.group(2)) else ""
+        dishes.append((m.group(1) if amount else name, amount))
+    head = st.get("head") or ""
+
+    def menu(size, n):
+        out, h = [], 0
+        for name, amount in dishes[:n]:
+            nl = lines_of(d, name, size, cw, 2)
+            out.append((nl, amount))
+            h += len(nl) * int(size * 1.25) + (46 if amount else 0) + int(size * 0.75)
+        return out, h
+
+    hl_size, room = 40, bottom - top - 70
+    hl = lines_of(d, head, hl_size, cw, 4) if head else []
+    hh = len(hl) * 56 + 30 if hl else 0
+    size, n = 64, len(dishes)
+    items, mh = menu(size, n)
+    while mh + hh > room and size > 42:
+        size -= 2
+        items, mh = menu(size, n)
+    while mh + hh + (60 if n < len(dishes) else 0) > room and n > 1:
+        n -= 1
+        items, mh = menu(size, n)
+    gap = max(0, min((room - mh - hh - (60 if n < len(dishes) else 0)) / (n + 1), 90))  # spread the dishes out
+    txt(d, (x0, top + 22), "这一餐", 38, TEAL, "lm", bold=True)
+    y = top + 70 + gap / 2
+    for nl, amount in items:
+        for line in nl:
+            txt(d, (x0, y + size * 0.62), line, size, INK, "lm", bold=True)
+            y += int(size * 1.25)
+        if amount:
+            txt(d, (x0, y + 18), amount, 38, (120, 116, 110), "lm")
+            y += 46
+        y += int(size * 0.75) + gap
+    if n < len(dishes):
+        txt(d, (x0, y + 20), "还有 %d 道" % (len(dishes) - n), 38, (120, 116, 110), "lm")
+        y += 60
+    if hl:
+        y = max(y, bottom - hh + 30)
+        d.rectangle((x0, y - 30, x0 + 56, y - 24), fill=TEAL)
+        for line in hl:
+            txt(d, (x0, y + 22), line, hl_size, INK, "lm")
+            y += 56
+    # one row of numbers, calories first in teal
+    y = H - 40 - fh
+    cwf = (W - 112) / len(facts)
+    facts, vs = fact_row(d, facts, 76, cwf - 28, 38, 38)
+    for i, (v, lab, u) in enumerate(facts):
+        x = 56 + i * cwf
+        value_unit(d, x, y + 96, v, u, vs, cwf - 28, TEAL if i == 0 else INK, INK, vs)
+        txt(d, (x, y + 150), fit(d, lab, 38, cwf - 28)[0], 38, (120, 116, 110), "ls")
+    return im
+
+
 def style_b_photo(st):
     """Magazine page with the photo as the hero (≥55 % of the card): slim masthead, the sentence on the photo,
     numbers and the full list (up to 6) below."""
@@ -1038,7 +1116,7 @@ def style_b_photo(st):
 
 def style_b(st):
     if st.get("kind") == "meal" and st.get("photos") and st.get("hero"):
-        return style_b_meal(st)
+        return style_b_menu(st) if len(st.get("rows") or []) >= 2 else style_b_meal(st)
     if st.get("photos"):
         return style_b_photo(st)
     im = Image.new("RGB", (W, H), CREAM)
