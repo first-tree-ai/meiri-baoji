@@ -1,0 +1,16 @@
+Default images for check-in cards when the user sent no photo (scripts/checkin_card.py picks by sport,
+meal or card type). Square crops, 640 px, softened and recompressed. All from Wikimedia Commons;
+CC0 or public domain, so no attribution is required. Listed for the record.
+
+strength-1.jpg: "Marines' voices echo, prompt new gym hours 150927-M-AI083-067.jpg", Lance Cpl. Jason Jimenez, Public domain, https://commons.wikimedia.org/wiki/File:Marines%27_voices_echo,_prompt_new_gym_hours_150927-M-AI083-067.jpg
+run-1.jpg: "Peak to Peak Charter School soccer field and running track, Lafayette, Colorado, USA - 2025.jpg", Mikepascoe, CC0, https://commons.wikimedia.org/wiki/File:Peak_to_Peak_Charter_School_soccer_field_and_running_track,_Lafayette,_Colorado,_USA_-_2025.jpg
+cycle-1.jpg: "Bicycle (Unsplash).jpg", Adrian Flores princecycling, CC0, https://commons.wikimedia.org/wiki/File:Bicycle_(Unsplash).jpg
+swim-1.jpg: "Swimming laps (Unsplash rAyIvNqlwCY).jpg", Artem Verbo artemverbo, CC0, https://commons.wikimedia.org/wiki/File:Swimming_laps_(Unsplash_rAyIvNqlwCY).jpg
+yoga-1.jpg: "Yoga mats.png", Sha89sha, CC0, https://commons.wikimedia.org/wiki/File:Yoga_mats.png
+hiit-1.jpg: "Bumper plates on bottom rack.webp", Wikideas1, CC0, https://commons.wikimedia.org/wiki/File:Bumper_plates_on_bottom_rack.webp
+walk-1.jpg: "Walking Through Fields (Unsplash).jpg", Jens Lelie leliejens, CC0, https://commons.wikimedia.org/wiki/File:Walking_Through_Fields_(Unsplash).jpg
+breakfast-1.jpg: "Baozi as a fast food(2026, Shandong).jpg", Cartonfox, CC0, https://commons.wikimedia.org/wiki/File:Baozi_as_a_fast_food(2026,_Shandong).jpg
+lunch-1.jpg: "MyPlate gov Cultural Food (20241025-USDA-FNS-UNK-0083) (cropped).jpg", USDAgov, Public domain, https://commons.wikimedia.org/wiki/File:MyPlate_gov_Cultural_Food_(20241025-USDA-FNS-UNK-0083)_(cropped).jpg
+dinner-1.jpg: "Yasai-itame 001.jpg", Ocdp, CC0, https://commons.wikimedia.org/wiki/File:Yasai-itame_001.jpg
+snack-1.jpg: "Fruit Platter (Unsplash).jpg", Cecilia Par famla_fint, CC0, https://commons.wikimedia.org/wiki/File:Fruit_Platter_(Unsplash).jpg
+bg-1.jpg: "Weatherworn top of wooden table.jpg", W.carter, CC0, https://commons.wikimedia.org/wiki/File:Weatherworn_top_of_wooden_table.jpg

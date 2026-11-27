@@ -260,7 +260,7 @@ def default_photos(kind, spec):
         groups = [group]
     elif kind == "meal":
         text = "%s %s" % (spec.get("label") or "", spec.get("dishes") or "")
-        groups = [g for g, words in MEAL_GROUPS if any(w in text for w in words)][:1] + ["plate"]
+        groups = [g for g, words in MEAL_GROUPS if any(w in text for w in words)][:1] or [g for g, _ in MEAL_GROUPS]
     else:
         groups = ["bg"]
     names = sorted(n for n in os.listdir(folder) for g in groups if n.startswith(g + "-") and n.endswith(".jpg"))
@@ -642,6 +642,10 @@ def fade(im, y0, y1, alpha):
 def style_a(st):
     """Big-type poster: the photo fills the card (darkened at the bottom) or a near-black page; teal only for accents."""
     im = Image.new("RGB", (W, H), A_BG)
+    if st.get("backdrop"):
+        img, focus, _ = st["backdrop"][0]
+        im.paste(cover(img, W, H, focus), (0, 0))
+        im.paste(Image.new("RGB", (W, H), A_BG), (0, 0), Image.new("L", (W, H), 175))
     d = draw(im)
     photos = st.get("photos")
     facts = st.get("facts_ab") or st.get("facts") or []
@@ -1073,9 +1077,12 @@ def render(kind, spec):
     kind = KIND_ALIASES.get(kind, kind)
     st = STORIES[kind](spec)
     st["kind"] = kind
-    if not st.get("photos"):
-        st["photos"] = default_photos(kind, spec)
     style = STYLES.get(str(spec.get("style") or "A").strip().lower(), "A")
+    if not st.get("photos"):
+        if kind in ("meal", "workout"):
+            st["photos"] = default_photos(kind, spec)
+        elif style == "A":  # daily / weekly: a quiet backdrop behind the big type, not a photo slot
+            st["backdrop"] = default_photos(kind, spec)
     return STYLE_FN[style](st)
 
 

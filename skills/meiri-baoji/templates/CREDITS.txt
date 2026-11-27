@@ -1,4 +1,3 @@
 Example cards rendered by scripts/checkin_card.py, styles A (poster), B (magazine), C (dashboard) left to right
-(390×520 previews of the 1080×1440 output).
-Meal photos: the 每日薄肌 team's own photos.
-workout.jpg (style A): "Trap bar with load", Wikimedia Commons, CC0.
+(180×240 previews of the 1080×1440 output). Meal photos: the 每日薄肌 team's own photos. Other images:
+assets/placeholders (see assets/placeholders/CREDITS.txt).
