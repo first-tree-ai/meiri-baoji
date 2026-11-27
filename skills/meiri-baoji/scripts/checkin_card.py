@@ -943,9 +943,9 @@ def style_b_meal(st):
 
 
 def style_b_menu(st):
-    """Meal with 2+ dishes, like a printed menu laid on the table: the photo fills the card, a cream menu card sits
-    over its lower part with the dishes centred (amount in grey after each), the sentence, then one row of
-    same-size numbers. Text sits on cream or on a darkened top, so light photos stay readable."""
+    """Meal with 2+ dishes: the photo fills the card (it shows the dishes), a small cream card sits at the bottom
+    with "今日菜单 · N 道", the sentence and one row of same-size numbers. Text sits on cream or on a darkened
+    top, so light photos stay readable."""
     im = Image.new("RGB", (W, H), CREAM)
     photos = st["photos"]
     collage(im, (0, 0, W, H), photos[:4], gap=8)  # no "+N" pill: the menu card and the chip cover the corners
@@ -959,72 +959,40 @@ def style_b_menu(st):
     w = txt(d, (56, 150), big, bs, WHITE, "ls", bold=True)
     tail = " · ".join(x for x in (s1, s2) if x)
     txt(d, (56 + w + 22, 150), fit(d, tail, 42, W - 112 - w - 22)[0], 42, WHITE, "ls")
-    dishes = []
-    for name, _ in st.get("rows") or []:
-        m = re.match(r"^(.*\S)\s+(\S+)$", name)
-        amount = m.group(2) if m and PORTION.match(m.group(2)) else ""
-        dishes.append((m.group(1) if amount else name, amount))
     facts = [(st["hero"][1], "热量", "千卡")] + [f for f in st.get("facts") or [] if f[0]][:3]
-    x0, x1 = 48, W - 48
-    inner = x1 - x0 - 112
-    hl = lines_of(d, st.get("head") or "", 38, inner, 2) if st.get("head") else []
-
-    def heights(size, n):
-        return 92 + n * int(size * 1.62) + (58 if n < len(dishes) else 0) + (len(hl) * 54 + 34 if hl else 0) + 210
-
-    size, n = 54, len(dishes)
-    while heights(size, n) > H * 0.62 and size > 44:
-        size -= 2
-    while heights(size, n) > H * 0.62 and n > 2:
-        n -= 1
-    ph = heights(size, n)
-    top = H - 48 - ph
-    # soft shadow, then the card
+    x0, x1 = 64, W - 64
+    inner = x1 - x0 - 80
+    grey = (130, 124, 116)
+    hl = lines_of(d, st.get("head") or "", MIN_PX, inner, 1) if st.get("head") else []
+    ph = 34 + 44 + (len(hl) * 50 + 10 if hl else 0) + 12 + 128 + 26
+    top = H - 40 - ph
     from PIL import ImageFilter as IF
 
     sh = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(sh).rounded_rectangle((x0, top + 12, x1, H - 36), 36, fill=120)
-    im.paste(Image.new("RGB", (W, H), (0, 0, 0)), (0, 0), sh.filter(IF.GaussianBlur(18)))
+    ImageDraw.Draw(sh).rounded_rectangle((x0, top + 10, x1, H - 30), 30, fill=110)
+    im.paste(Image.new("RGB", (W, H), (0, 0, 0)), (0, 0), sh.filter(IF.GaussianBlur(16)))
     d = draw(im)
-    d.rounded_rectangle((x0, top, x1, H - 48), 36, fill=CREAM)
-    mark("box", (x0, top, x1, H - 48))
+    d.rounded_rectangle((x0, top, x1, H - 40), 30, fill=CREAM)
+    mark("box", (x0, top, x1, H - 40))
     cx = W / 2
-    y = top + 56
-    label = "今日菜单 · %d 道" % len(dishes)
-    lw = tw(d, label, 36)
-    txt(d, (cx, y), label, 36, TEAL, "mm", bold=True)
-    for sx in (cx - lw / 2 - 28 - 60, cx + lw / 2 + 28):
-        d.rectangle((sx, y - 1, sx + 60, y + 1), fill=TEAL)
-    y += 50
-    rh = int(size * 1.62)
-    for name, amount in dishes[:n]:
-        cy = y + rh / 2
-        aw = tw(d, amount, 36) + 18 if amount else 0
-        nm, ns = fit(d, name, size, inner - aw, 40)
-        total = tw(d, nm, ns) + aw
-        nx = cx - total / 2
-        w = txt(d, (nx, cy), nm, ns, INK, "lm", bold=True)
-        if amount:
-            txt(d, (nx + w + 18, cy + 4), amount, 36, (130, 124, 116), "lm")
-        y += rh
-    if n < len(dishes):
-        txt(d, (cx, y + 26), "还有 %d 道" % (len(dishes) - n), 36, (130, 124, 116), "mm")
-        y += 58
-    if hl:
-        y += 10
-        for line in hl:
-            txt(d, (cx, y + 24), line, 38, (96, 92, 86), "mm")
-            y += 54
-        y += 24
-    # numbers: one row, same size, centred under the menu
-    y = H - 48 - 200
-    cw = (x1 - x0 - 64) / len(facts)
-    facts, vs = fact_row(d, facts, 68, cw - 20, 34, 38)
+    y = top + 34 + 20
+    label = "今日菜单 · %d 道" % len(st.get("rows") or [])
+    lw = tw(d, label, MIN_PX)
+    txt(d, (cx, y), label, MIN_PX, TEAL, "mm", bold=True)
+    for sx in (cx - lw / 2 - 22 - 48, cx + lw / 2 + 22):
+        d.rectangle((sx, y - 1, sx + 48, y + 1), fill=TEAL)
+    y += 30
+    for line in hl:
+        txt(d, (cx, y + 28), line, MIN_PX, (96, 92, 86), "mm")
+        y += 50
+    # numbers: one row, same size
+    y = H - 40 - 26 - 128
+    cw = (x1 - x0 - 40) / len(facts)
+    facts, vs = fact_row(d, facts, 60, cw - 16, MIN_PX, MIN_PX)
     for i, (v, lab, u) in enumerate(facts):
-        fx = x0 + 32 + (i + 0.5) * cw
-        vt = fit(d, v, vs, cw - 20)[0]
-        txt(d, (fx, y + 92), vt, vs, TEAL if i == 0 else INK, "ms", bold=True)
-        txt(d, (fx, y + 140), fit(d, lab, 34, cw - 20)[0], 34, (130, 124, 116), "ms")
+        fx = x0 + 20 + (i + 0.5) * cw
+        txt(d, (fx, y + 70), fit(d, v, vs, cw - 16)[0], vs, TEAL if i == 0 else INK, "ms", bold=True)
+        txt(d, (fx, y + 120), fit(d, lab, MIN_PX, cw - 16)[0], MIN_PX, grey, "ms")
     return im
 
 
