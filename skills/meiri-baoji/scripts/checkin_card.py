@@ -126,6 +126,25 @@ def wrap(d, text, font, width):
     return lines
 
 
+def item_lines(d, text, size, width, limit):
+    """A " · " list wrapped between items (never inside a dish or exercise name)."""
+    parts = [p.strip() for p in str(text).split("·") if p.strip()]
+    lines, cur = [], ""
+    for p in parts:
+        nxt = cur + " · " + p if cur else p
+        if cur and tw(d, nxt, size) > width:
+            lines.append(cur)
+            cur = p
+        else:
+            cur = nxt
+    if cur:
+        lines.append(cur)
+    if len(lines) > limit:
+        lines = lines[:limit]
+        lines[-1] = fit(d, lines[-1] + " …", size, width)[0]
+    return [fit(d, ln, size, width)[0] for ln in lines]
+
+
 def lines_of(d, text, size, width, limit):
     """At most limit lines; a cut-off text ends in "…" instead of stopping mid-sentence."""
     font = F(size)
@@ -302,7 +321,7 @@ def tile_boxes(box, n, gap):
     return [(x0, y0, mx, my), (mx + gap, y0, x1, my), (x0, my + gap, mx, y1), (mx + gap, my + gap, x1, y1)]
 
 
-def collage(im, box, photos, r=0, gap=10):
+def collage(im, box, photos, r=0, gap=10, plus_top=False):
     """Lay out 1–4 photos in the box; 5+ keeps the first and the three sharpest others, the last tile says +N."""
     extra = 0
     if len(photos) > 4:
@@ -319,7 +338,8 @@ def collage(im, box, photos, r=0, gap=10):
         a, b, c, e = boxes[-1]
         shade = (round_mask(c - a, e - b, r) if r else Image.new("L", (c - a, e - b), 255)).point(lambda v: v * 150 // 255)
         im.paste(Image.new("RGB", (c - a, e - b), (0, 0, 0)), (a, b), shade)
-        txt(draw(im), ((a + c) / 2, (b + e) / 2), "+%d" % extra, 96, WHITE, "mm", bold=True)
+        # "+N" sits high in the tile when text is laid over the bottom of the photo
+        txt(draw(im), ((a + c) / 2, b + 90 if plus_top else (b + e) / 2), "+%d" % extra, 96, WHITE, "mm", bold=True)
 
 
 def shade_top(im, h=230, alpha=170):
@@ -441,7 +461,7 @@ def story_meal(spec):
     return dict(kicker=label or "这一餐", mast=(word if 0 < len(word) <= 3 else "这一餐",
                                                label[len(word):].strip(" ·") if word else "", "饮食打卡"),
                 hero=("这一餐约", kcal, "千卡", None) if kcal else None, head=head,
-                sub=" · ".join(dishes) if dishes and head else "", facts=facts, bars=bars,
+                sub=" · ".join(dishes), facts=facts, bars=bars,
                 rows=[(x, "") for x in dishes] if dishes else [], photos=photos,
                 head_b=head or " · ".join(dishes))
 
@@ -472,6 +492,8 @@ def story_workout(spec):
     return dict(kicker=name, mast=(shown(minutes), "分钟", name), hero=("今天练了", shown(minutes), "分钟", None),
                 ring=(score, spec.get("score_label") or "运动分") if score is not None else None,
                 head=spec.get("line") or "", facts=facts,
+                sub=" · ".join(k for k, _ in rows[:6]) + (" 等 %d 个动作" % (len(rows) + int(number(spec.get("more")) or 0))
+                                                         if len(rows) > 6 or number(spec.get("more")) else ""),
                 facts_ab=facts[:2] + ([(shown(score), "运动分", "")] if score is not None else facts[2:3]),
                 rows=rows, more=int(number(spec.get("more")) or 0), photos=load_photos(spec),
                 list=[(k, v) for k, v in rows])
@@ -666,8 +688,11 @@ def style_a(st):
     foot = st.get("foot")
     if not facts and not foot and not st.get("photos") and st.get("kicker"):
         facts = [(st["kicker"], "", "")]
-    # dark panel at the bottom: facts, then the foot line
-    panel_h = (190 if len(facts) > 1 else 170 if facts else 0) + (110 if foot else 0)
+    # on a photo the items (dishes, exercises) go into the panel in full, so nothing is cut to one line
+    items = item_lines(d, st["sub"], 40, W - 176, 3) if photos and st.get("sub") else []
+    # dark panel at the bottom: items, facts, then the foot line
+    fact_h = (150 if items else 190) if len(facts) > 1 else 170 if facts else 0
+    panel_h = (len(items) * 54 + (24 if facts else 0)) + fact_h + (110 if foot else 0)
     panel_h = panel_h + 60 if panel_h else 0
     panel_top = H - 32 - panel_h if panel_h else H - 40
     hero = st.get("hero")
@@ -675,8 +700,10 @@ def style_a(st):
     label = hero[0] if hero else ""
     unit, pill_text = (hero[2], hero[3]) if hero else ("", None)
     head = st.get("head") or ""
-    sub = st.get("sub") or ""
+    sub = "" if photos else st.get("sub") or ""
     week = st.get("week")
+    if photos:
+        label = ""  # the kicker already says what this is; the photo needs the room
 
     def mid_height(bs, hs, nlines):
         return ((60 if label else 0) + (bs * 0.75 if big else 0) + (60 if big else 0) + nlines * (hs + 22)
@@ -686,14 +713,31 @@ def style_a(st):
     hl = lines_of(d, head, hs, W - 128, 3) if head else []
     top = 150
     if photos:
-        bs = 300 if len(big) <= 3 else 220
-        need_h = mid_height(bs, hs, len(hl))
-        top = max(int(H * 0.4), panel_top - 40 - need_h)
+        # the photo is the hero: the sentence sits on top (like a cover line), the numbers in the bottom 45 %
+        bs, hs = (240 if len(big) <= 3 else 170), 56
+        top_lines = lines_of(d, head, 52, W - 128, 2) if head else []
+        hl = []
+        room = W - 120 - (tw(d, unit, 64) + 30 if unit else 0) - (tw(d, pill_text, 52) + 90 if pill_text else 0)
+        while big and bs > 110 and tw(d, big, bs) + bs // 18 > room:
+            bs -= 10
+        budget = panel_top - 40 - int(H * 0.55)
+        while mid_height(bs, hs, len(hl)) > budget and bs > 110:
+            bs -= 10
+        while mid_height(bs, hs, len(hl)) > budget and hs > 44:
+            hs -= 4
+            hl = lines_of(d, head, hs, W - 128, 2)
+        if mid_height(bs, hs, len(hl)) > budget:
+            week = None
+        if mid_height(bs, hs, len(hl)) > budget:
+            hl = lines_of(d, head, hs, W - 128, 1) if head else []
+        top = panel_top - 40 - mid_height(bs, hs, len(hl))
         # one photo fills the card; several photos stop where the text starts, so no tile (or "+N") sits under it
         collage(im, (0, 0, W, H if len(photos) == 1 else top + 20), photos, gap=8)
-        shade_top(im)
+        shade_top(im, 150 + len(top_lines) * 74 + 60, 190 if top_lines else 170)
         if hero or head or sub or week or panel_h:
-            fade(im, top - 260, top + 60, 236)
+            fade(im, top - 160, top + 40, 236)
+        for i, line in enumerate(top_lines):
+            txt(d, (64, 150 + i * 74 + 26), line, 52, WHITE, "lm", bold=True)
     else:
         bs = 460 if len(big) <= 2 else 380 if len(big) <= 3 else 300
     kick_ink = WHITE
@@ -702,10 +746,10 @@ def style_a(st):
     while big and bs > 120 and tw(d, big, bs) + bs // 18 > room:
         bs -= 10
     avail = panel_top - 40 - top
-    while hl and hs < 100 and mid_height(bs, hs + 8, len(lines_of(d, head, hs + 8, W - 128, 3))) < avail * 0.8:
+    while not photos and hl and hs < 100 and mid_height(bs, hs + 8, len(lines_of(d, head, hs + 8, W - 128, 3))) < avail * 0.8:
         hs += 8
         hl = lines_of(d, head, hs, W - 128, 3)
-    while mid_height(bs, hs, len(hl)) > avail and (bs > 140 or hs > 56):
+    while not photos and mid_height(bs, hs, len(hl)) > avail and (bs > 140 or hs > 56):
         if bs > 140:
             bs -= 20
         else:
@@ -744,6 +788,13 @@ def style_a(st):
     d.rounded_rectangle((32, panel_top, W - 32, H - 32), 44, fill=A_PANEL)
     mark("box", (32, panel_top, W - 32, H - 32))
     ty = panel_top + 40
+    for line in items:
+        txt(d, (88, ty + 27), line, 40, (225, 225, 225), "lm")
+        ty += 54
+    if items and facts:
+        ty += 4
+        d.line((80, ty, W - 80, ty), fill=(60, 66, 68), width=3)
+        ty += 20
     if len(facts) == 1:
         v, lab, u = facts[0]
         lab = (u + lab) if u and lab else (u or lab)
@@ -758,9 +809,11 @@ def style_a(st):
             x = 56 + 24 + i * cw
             if i:
                 d.line((x - 12, ty + 10, x - 12, ty + 170), fill=(60, 66, 68), width=3)
-            value_unit(d, x + 16, ty + 96, v, u, 96, cw - 40, WHITE, GREY)
-            txt(d, (x + 16, ty + 160), fit(d, lab, 44, cw - 40)[0], 44, TEAL, "ls")
-        ty += 190
+            small = fact_h < 190
+            value_unit(d, x + 16, ty + (80 if small else 96), v, u, 80 if small else 96, cw - 40, WHITE, GREY)
+            txt(d, (x + 16, ty + (134 if small else 160)), fit(d, lab, 40 if small else 44, cw - 40)[0],
+                40 if small else 44, TEAL, "ls")
+        ty += fact_h
     if foot:
         if facts:
             d.line((80, ty, W - 80, ty), fill=(60, 66, 68), width=3)
@@ -771,7 +824,124 @@ def style_a(st):
 
 # ---------- style B: magazine page on cream ----------
 
+def b_list(d, x0, x1, y, rows, two_col, rh):
+    """Numbered list; names-only lists of 4+ go in two columns."""
+    if two_col:
+        cw = (x1 - x0) / 2
+        for i, (k, _) in enumerate(rows):
+            r, c = i // 2, i % 2
+            cy = y + r * rh + rh / 2
+            x = x0 + c * cw
+            txt(d, (x, cy), "%02d" % (i + 1), 38, TEAL, "lm", bold=True)
+            txt(d, (x + 70, cy), fit(d, k, 42, cw - 90)[0], 42, INK, "lm", bold=True)
+        for r in range((len(rows) + 1) // 2 + 1):
+            d.line((x0, y + r * rh, x1, y + r * rh), fill=RULE, width=2)
+        return y + ((len(rows) + 1) // 2) * rh
+    for i, (k, v) in enumerate(rows):
+        cy = y + i * rh + rh / 2
+        d.line((x0, y + i * rh, x1, y + i * rh), fill=RULE, width=2)
+        txt(d, (x0, cy), "%02d" % (i + 1), 38, TEAL, "lm", bold=True)
+        vw = 0
+        if v:
+            vt = fit(d, v, 40, (x1 - x0) * 0.42)[0]
+            txt(d, (x1, cy), vt, 40, TEAL, "rm")
+            vw = tw(d, vt, 40) + 24
+        txt(d, (x0 + 70, cy), fit(d, k, 42, x1 - x0 - 70 - vw)[0], 42, INK, "lm", bold=True)
+    d.line((x0, y + len(rows) * rh, x1, y + len(rows) * rh), fill=RULE, width=2)
+    return y + len(rows) * rh
+
+
+def style_b_photo(st):
+    """Magazine page with the photo as the hero (≥55 % of the card): slim masthead, the sentence on the photo,
+    numbers and the full list (up to 6) below."""
+    im = Image.new("RGB", (W, H), CREAM)
+    d = draw(im)
+    big, s1, s2 = st["mast"]
+    brand_chip(im, W - 56, 48)
+    bs = 104
+    while bs > 60 and tw(d, big, bs) > 420:
+        bs -= 8
+    w = txt(d, (56, 150), big, bs, TEAL, "ls", bold=True)
+    tail = " · ".join(x for x in (s1, s2) if x)
+    txt(d, (56 + w + 24, 150), fit(d, tail, 44, W - 112 - w - 24)[0], 44, INK, "ls")
+    d.rectangle((56, 176, W - 56, 180), fill=INK)
+    photos, head, foot, week = st["photos"], st.get("head") or "", st.get("foot"), st.get("week")
+    rows, more = st.get("rows") or [], st.get("more", 0)
+    facts = [] if st.get("kind") in ("daily", "weekly") else [f for f in st.get("facts_ab") or st.get("facts") or []
+                                                            if f[0]][:3]
+    if st.get("kind") == "meal" and st.get("hero"):
+        facts = [(st["hero"][1], "热量 · 千卡", "")] + facts[:2]
+    shown_rows = rows[:6]
+    hidden = len(rows) - len(shown_rows) + more
+    if hidden:
+        shown_rows = shown_rows + [("还有 %d 项" % hidden, "")]
+    two_col = len(shown_rows) >= 4 and not any(v for _, v in shown_rows)
+    rh = 64 if two_col else 60
+    list_h = (((len(shown_rows) + 1) // 2) if two_col else len(shown_rows)) * rh
+    bottom = H - (110 if foot else 40)
+    top, min_ph = 200, int(H * 0.55)
+    fh, wh = (140 if facts else 0), (120 if week else 0)
+
+    def ph():
+        return bottom - top - (fh + 20 if fh else 0) - (wh if wh else 0) - (list_h + 20 if list_h else 0)
+
+    if ph() < min_ph:
+        wh = 0
+    facts_on_photo = False
+    if ph() < min_ph and fh:  # numbers move onto the photo instead of shrinking it
+        fh, facts_on_photo = 0, True
+    p = max(ph(), min_ph) if ph() >= min_ph else ph()
+    y = top
+    collage(im, (56, y, W - 56, y + p), photos, r=10, gap=12, plus_top=True)
+    # the sentence (and, if needed, the numbers) sit on the darkened bottom of the photo
+    hl = lines_of(d, head, 52, W - 200, 2) if head else []
+    over = len(hl) * 70 + (150 if facts_on_photo else 0)
+    if over:
+        sh = over + 120
+        g = Image.new("L", (1, sh))
+        for i in range(sh):
+            g.putpixel((0, i), int(215 * min(1, i / (sh * 0.6))))
+        mask = Image.new("L", (W - 112, sh))
+        mask.paste(g.resize((W - 112, sh)))
+        rm = round_mask(W - 112, p, 10).crop((0, p - sh, W - 112, p))
+        from PIL import ImageChops
+
+        im.paste(Image.new("RGB", (W - 112, sh), (0, 0, 0)), (56, int(y + p - sh)), ImageChops.multiply(mask, rm))
+        ty = y + p - over - 20
+        for line in hl:
+            txt(d, (96, ty + 35), line, 52, WHITE, "lm", bold=True)
+            ty += 70
+        if facts_on_photo:
+            cw = (W - 192) / len(facts)
+            for i, (v, lab, u) in enumerate(facts):
+                x = 96 + i * cw
+                value_unit(d, x, ty + 78, v, u, 64, cw - 24, TEAL if i == 0 else WHITE, (210, 210, 210))
+                txt(d, (x, ty + 126), fit(d, lab, 38, cw - 24)[0], 38, (210, 210, 210), "ls")
+    y += p + 20
+    if fh:
+        d.line((56, y, W - 56, y), fill=RULE, width=3)
+        cw = (W - 112) / len(facts)
+        for i, (v, lab, u) in enumerate(facts):
+            x = 56 + i * cw
+            if i:
+                d.line((x, y + 24, x, y + fh - 24), fill=RULE, width=3)
+            value_unit(d, x + (24 if i else 0), y + 80, v, u, 64, cw - 48, TEAL, INK)
+            txt(d, (x + (24 if i else 0), y + 130), fit(d, lab, 38, cw - 48)[0], 38, INK, "ls")
+        y += fh + 20
+    if wh:
+        week_dots(d, 56, W - 56, y + wh / 2, week.get("done"), TEAL, RULE, INK, (120, 116, 110), r=40)
+        y += wh
+    if shown_rows:
+        b_list(d, 56, W - 56, y, shown_rows, two_col, rh)
+    if foot:
+        d.rectangle((0, H - 110, W, H), fill=INK)
+        txt(d, (56, H - 55), fit(d, "%s → %s" % foot, 46, W - 112)[0], 46, WHITE, "lm")
+    return im
+
+
 def style_b(st):
+    if st.get("photos"):
+        return style_b_photo(st)
     im = Image.new("RGB", (W, H), CREAM)
     d = draw(im)
     big, s1, s2 = st["mast"]
@@ -948,21 +1118,29 @@ def style_c(st):
     note_h = sum(p[1] + 26 for p in parts) + 50
     photos = st.get("photos")
     rows = []  # (name, base height, minimum)
+    over_sub = ""
     if photos:
-        rows.append(("photo", 440, 300))
-    if hero or ring_:
+        # the photo is the hero (≥55 % of the card); the main number and the ring sit on it
+        rows.append(("photo", int(H * 0.55), int(H * 0.55)))
+        if kind == "meal":
+            over_sub = st.get("sub") or ""
+        elif kind == "daily" and lst:
+            over_sub = " · ".join(("%s %s" % (k, v)).strip() for k, v in lst)
+            lst = []
+    elif hero or ring_:
         rows.append(("hero", 340, 280))
     if bars:
-        rows.append(("bars", 240, 220))
+        rows.append(("bars", 240, 170 if photos else 220))
     if facts:
         rows.append(("facts", 220, 200))
     if lst:
-        rows.append(("list", 90 * min(len(lst), 4) + 70, 90 * min(len(lst), 2) + 70))
+        n_l = min(len(lst), 6) + (1 if len(lst) > 6 or st.get("more") else 0)
+        rows.append(("list", 90 * min(len(lst), 4) + 70, (56 * n_l + 40) if photos else 90 * min(len(lst), 2) + 70))
     if week:
         rows.append(("week", 230, 200))
     if note:
         rows.append(("note", note_h + 40, note_h))
-    drop = ["list", "facts", "week", "bars"]
+    drop = ["week", "note", "facts", "bars"] if photos else ["list", "facts", "week", "bars"]
     while sum(r[2] for r in rows) + G * (len(rows) - 1) > bottom - top and drop:
         name = drop.pop(0)
         rows = [r for r in rows if r[0] != name]
@@ -980,7 +1158,8 @@ def style_c(st):
         h = int(h)
         b = (x0, y, x1, y + h)
         if name == "photo":
-            collage(im, b, photos, r=36, gap=12)
+            collage(im, b, photos, r=36, gap=12, plus_top=True)
+            photo_overlay(im, d, b, hero, ring_, over_sub, st)
         elif name == "hero":
             split = x1 if not ring_ else x0 + (x1 - x0) * (0.6 if hero else 0)
             if hero:
@@ -1024,17 +1203,22 @@ def style_c(st):
                 if name == "bars":
                     n, v, frac = it
                     txt(d, (tx0 + 30, y + 56), fit(d, n, 40, cw - 60)[0], 40, GREY, "lm")
-                    v, vs = fit(d, v, 76, cw - 60, 46)
-                    txt(d, (tx0 + 28, y + 56 + (h - 56) * 0.55), v, vs, WHITE, "ls", bold=True)
+                    v, vs = fit(d, v, 64 if h < 220 else 76, cw - 60, 46)
+                    if h < 220:
+                        vb = y + h - (66 if frac is not None else 34)
+                    else:
+                        vb = y + 56 + (h - 56) * 0.55
+                    txt(d, (tx0 + 28, vb), v, vs, WHITE, "ls", bold=True)
                     if frac is not None:
-                        bar(d, tx0 + 30, tx0 + cw - 30, y + h - 52, frac, BAR_COLORS[i % 3], 24)
+                        bar(d, tx0 + 30, tx0 + cw - 30, y + h - (40 if h < 220 else 52), frac, BAR_COLORS[i % 3],
+                            20 if h < 220 else 24)
                 else:
                     v, lab, u = it
                     value_unit(d, tx0 + 28, y + h / 2 + 14, v, u, 80, cw - 56, WHITE if i else TEAL, GREY)
                     txt(d, (tx0 + 30, y + h / 2 + 70), fit(d, lab, 40, cw - 60)[0], 40, GREY, "ls")
         elif name == "list":
             tile(d, b)
-            n = max(1, min(len(lst), int((h - 40) // 84)))
+            n = max(1, min(len(lst), 6, int((h - 40) // (56 if photos else 84))))
             hidden = len(lst) - n + st.get("more", 0)
             slots = n + (1 if hidden else 0)
             step = (h - 40) / slots
@@ -1081,6 +1265,44 @@ def style_c(st):
                 ly += step
         y += h + G
     return im
+
+
+def photo_overlay(im, d, box, hero, ring_, sub, st):
+    """Dashboard photo tile: darken its bottom and put the main number (and ring, and the item list) on it."""
+    x0, y0, x1, y1 = (int(v) for v in box)
+    lines = item_lines(d, sub, 40, x1 - x0 - 80 - (230 if ring_ else 0), 2) if sub else []
+    bs = 130
+    need = (bs * 0.8 + 50 if hero else 0) + len(lines) * 54 + (14 if lines else 0) + 50
+    if ring_:
+        need = max(need, 260)
+    sh = int(need + 140)
+    g = Image.new("L", (1, sh))
+    for i in range(sh):
+        g.putpixel((0, i), int(225 * min(1, i / (sh * 0.55))))
+    from PIL import ImageChops
+
+    mask = ImageChops.multiply(g.resize((x1 - x0, sh)), round_mask(x1 - x0, y1 - y0, 36).crop((0, y1 - y0 - sh, x1 - x0, y1 - y0)))
+    im.paste(Image.new("RGB", (x1 - x0, sh), (0, 0, 0)), (x0, y1 - sh), mask)
+    y = y1 - need + 10
+    for ln in lines:
+        txt(d, (x0 + 40, y + 27), ln, 40, (225, 225, 225), "lm")
+        y += 54
+    y += 14 if lines else 0
+    if hero:
+        txt(d, (x0 + 40, y + 20), hero[0], 40, TEAL, "lm")
+        unit_w = tw(d, hero[2], 52) + 20 if hero[2] else 0
+        v, vs = fit(d, hero[1], bs, x1 - x0 - 80 - unit_w - (230 if ring_ else 0), 70)
+        base = y + 50 + vs * 0.78
+        w = txt(d, (x0 + 36, base), v, vs, WHITE, "ls", bold=True)
+        if hero[2]:
+            txt(d, (x0 + 36 + w + 14, base), hero[2], 52, (220, 220, 220), "ls")
+    if ring_:
+        r = 84
+        cx, cy = x1 - 40 - r - 10, y1 - 40 - r - 50
+        ring(d, cx, cy, r, 26, ring_[0] / 100, TEAL, (90, 92, 94))
+        sc, ss = fit(d, shown(ring_[0]), 76, r * 1.3, 50)
+        txt(d, (cx, cy), sc, ss, WHITE, "mm", bold=True)
+        txt(d, (cx, y1 - 50), fit(d, ring_[1], 38, 2 * r + 60)[0], 38, TEAL, "mm")
 
 
 STYLE_FN = {"A": style_a, "B": style_b, "C": style_c}
