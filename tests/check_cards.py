@@ -19,8 +19,7 @@ from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
 cc.Image, cc.ImageDraw, cc.ImageFont = Image, ImageDraw, ImageFont
 cc.F = cc.phone_fonts(cc.font_loader())
-RENDER = {"meal": cc.meal, "workout": cc.workout, "daily-nutrition": cc.daily_nutrition,
-          "daily-timeline": cc.daily_timeline, "daily-workout": cc.daily_workout}
+RENDER = cc.RENDER
 
 
 def photo(tmp, color):

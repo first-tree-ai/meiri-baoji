@@ -19,7 +19,8 @@ import sys
 from _common import font_loader, require_pillow, wrap
 
 USAGE = __doc__
-KINDS = ("meal", "workout", "daily-nutrition", "daily-timeline", "daily-workout")
+KINDS = ("meal", "meal-split", "meal-polaroid", "workout", "workout-poster", "workout-list", "daily-nutrition",
+         "daily-timeline", "daily-workout", "daily-highlight", "weekly", "weekly-bars")
 HERE = os.path.dirname(os.path.abspath(__file__))
 ASSETS = os.path.join(HERE, "..", "assets")
 SPORTS = ("strength", "run", "cycle", "swim", "yoga", "hiit")
@@ -510,7 +511,7 @@ def stat_tiles(d, y, stats, h=170):
         mark("box", (x, y, x + cw, y + h))
         d.text((x + 26, y + 26), fit(d, s.get("name", ""), 24, cw - 52)[0], font=F(24), fill=T["sub"])
         unit = s.get("unit") or s.get("sub") or ""
-        unit = "" if unit.startswith("+") else fit(d, unit, 24, (cw - 52) // 3)[0]
+        unit = "" if unit.startswith("+") else fit(d, unit, 24, (cw - 52) // 2)[0]
         value, size = fit(d, bare(s.get("value", ""), unit).lstrip("约 "), 52, cw - 52 - (10 + d.textlength(unit, font=F(24)) if unit else 0), 30)
         d.text((x + 26, y + h - 30), value, font=F(size), fill=T["ink"], anchor="ls")
         if unit:
@@ -736,6 +737,249 @@ def daily_workout(spec):
     return im
 
 
+def meal_split(spec):
+    """Meal, split layout: the photo fills the top, the number and macros sit on a calm panel below."""
+    global T
+    T = THEMES["light"]
+    if not spec.get("photo") or not spec.get("kcal"):
+        sys.exit("NOT_ENOUGH_DATA: meal-split needs photo and kcal; reply in text instead")
+    tg, m = spec.get("targets") or {}, spec.get("macros") or {}
+    items = []
+    for key, name in (("protein", "蛋白质"), ("carb", "碳水"), ("fat", "脂肪")):
+        if m.get(key):
+            try:
+                lo_hi = [float(x) for x in str(m[key]).replace("–", "-").split("-") if x.strip()]
+            except ValueError:
+                lo_hi = []
+            items.append((name, str(m[key]).replace("-", "–"), "g",
+                          (sum(lo_hi) / len(lo_hi)) / tg[key] if tg.get(key) and lo_hi else None))
+    photo_h = 700 if items else 860
+    im = Image.new("RGB", (W, H), T["bg"])
+    im.paste(cover(open_photo(spec["photo"]), W, photo_h), (0, 0))
+    top = Image.new("L", (1, 200))
+    for yy in range(200):
+        top.putpixel((0, yy), int(150 * (1 - yy / 200)))
+    im.paste(Image.new("RGB", (W, 200), (0, 0, 0)), (0, 0), top.resize((W, 200)))
+    d = draw(im)
+    header(im, d, spec.get("label") or "这一餐", on_photo=True)
+    y = photo_h + GAP
+    if spec.get("dishes"):
+        d.text((48, y), lines_of(d, spec["dishes"], F(30), W - 96, 1)[0], font=F(30), fill=T["sub"])
+        y += 70
+    big, size = fit(d, "约 " + bare(spec["kcal"], "千卡").lstrip("约 ").replace("-", "–"), 104,
+                    W - 96 - 16 - d.textlength("千卡", font=F(30)), 64)
+    d.text((48, y + 100), big, font=F(size), fill=T["ink"], anchor="ls")
+    d.text((48 + d.textlength(big, font=F(size)) + 16, y + 100), "千卡", font=F(30), fill=T["sub"], anchor="ls")
+    y += 100 + GAP
+    if items:
+        nutrient_tiles(d, 48, W - 48, y, items)
+        y += TILE_H + GAP
+    if spec.get("line") and y + 64 < H - 40:
+        tomorrow(d, spec["line"], y=max(y, H - 118))
+    return im
+
+
+def meal_polaroid(spec):
+    """Meal, framed photo on a light page with one big number. Good when the macros are unknown."""
+    global T
+    T = THEMES["light"]
+    if not spec.get("photo") or not spec.get("kcal"):
+        sys.exit("NOT_ENOUGH_DATA: meal-polaroid needs photo and kcal; reply in text instead")
+    im = Image.new("RGB", (W, H), tuple(int(c * 0.08 + b * 0.92) for c, b in zip(TEAL, THEMES["light"]["bg"])))
+    d = draw(im)
+    header(im, d, spec.get("label") or "这一餐")
+    x0, y0, x1, y1 = 110, 160, W - 110, 900
+    d.rounded_rectangle((x0 - 24, y0 - 24, x1 + 24, y1 + 110), 28, fill=(255, 255, 255))
+    thumb(im, open_photo(spec["photo"]), (x0, y0, x1, y1), 18)
+    if spec.get("dishes"):
+        d.text((W // 2, y1 + 55), lines_of(d, spec["dishes"], F(30), x1 - x0, 1)[0], font=F(30), fill=T["sub"],
+               anchor="mm")
+    big, size = fit(d, "约 " + bare(spec["kcal"], "千卡").lstrip("约 ").replace("-", "–"), 112, W - 200, 64)
+    by = 1150
+    full = d.textlength(big, font=F(size)) + 16 + d.textlength("千卡", font=F(30))
+    bx = (W - full) // 2
+    d.text((bx, by), big, font=F(size), fill=T["ink"], anchor="ls")
+    d.text((bx + d.textlength(big, font=F(size)) + 16, by), "千卡", font=F(30), fill=T["sub"], anchor="ls")
+    tomorrow(d, spec.get("line"))
+    return im
+
+
+def workout_poster(spec):
+    """Workout, no photo needed: one huge number for the minutes, up to three stats, one line."""
+    global T
+    T = THEMES["dark"]
+    if not spec.get("minutes"):
+        sys.exit("NOT_ENOUGH_DATA: workout-poster needs minutes; reply in text instead")
+    im = Image.new("RGB", (W, H), T["bg"])
+    d = draw(im)
+    d.ellipse((W - 520, -260, W + 260, 520), fill=(14, 40, 37))
+    header(im, d, spec.get("label") or "运动", on_photo=True)
+    lines = summary_lines(d, spec.get("line"), 44, W - 96)
+    for i, ln in enumerate(lines):
+        d.text((48, 190 + i * 72), ln, font=F(44), fill=(255, 255, 255) if i < len(lines) - 1 else TEAL)
+    stats = [x for x in spec.get("stats") or [] if x.get("name") not in ("时长", "用时", "训练时长")][:3]
+    base = 760 if stats or spec.get("score") is not None else 900  # nothing below: sit lower on the page
+    big, size = fit(d, str(spec["minutes"]), 340, W - 300, 160)
+    d.text((48, base), big, font=F(size), fill=TEAL, anchor="ls")
+    d.text((48 + d.textlength(big, font=F(size)) + 20, base), "分钟", font=F(44), fill=(255, 255, 255), anchor="ls")
+    y = 860
+    if stats:
+        y = stat_tiles(d, y, stats) + GAP
+    if spec.get("score") is not None:
+        score_ring(d, W - 160, 1240, spec["score"], spec.get("score_label") or "运动分")
+    return im
+
+
+def workout_list(spec):
+    """Workout, exercise-first: up to five lifts in large rows, then the minutes. For strength days."""
+    global T
+    T = THEMES["dark"]
+    rows = as_rows(spec.get("exercises") or [])
+    if not rows or not spec.get("minutes"):
+        sys.exit("NOT_ENOUGH_DATA: workout-list needs minutes and exercises; use workout or workout-poster")
+    im = Image.new("RGB", (W, H), T["bg"])
+    d = draw(im)
+    header(im, d, spec.get("label") or "运动", on_photo=True)
+    if spec.get("line"):
+        d.text((48, 200), lines_of(d, spec["line"].replace("\n", ""), F(44), W - 96, 1)[0], font=F(44), fill=TEAL)
+    shown, more = rows[:5], len(rows) + (spec.get("more") or 0) - min(5, len(rows))
+    y = 300
+    for i, (name, val) in enumerate(shown):
+        cy = y + i * 128 + 64
+        d.rounded_rectangle((48, cy - 56, W - 48, cy + 56), R, fill=T["tile"])
+        d.text((84, cy), "%d" % (i + 1), font=F(30), fill=TEAL, anchor="lm")
+        val, vsize = fit(d, val, 30, 420, 24)
+        d.text((W - 84, cy), val, font=F(vsize), fill=T["sub"], anchor="rm")
+        d.text((150, cy), fit(d, name, 36, W - 260 - d.textlength(val, font=F(vsize)))[0], font=F(36), fill=T["ink"],
+               anchor="lm")
+    y += len(shown) * 128
+    if more > 0:
+        d.text((84, y + 30), "+ %d 个动作" % more, font=F(24), fill=T["sub"], anchor="lm")
+    big, size = fit(d, str(spec["minutes"]), 120, 400, 72)
+    d.text((48, H - 60), big, font=F(size), fill=TEAL, anchor="ls")
+    d.text((48 + d.textlength(big, font=F(size)) + 16, H - 60), "分钟", font=F(30), fill=(255, 255, 255), anchor="ls")
+    if spec.get("score") is not None:
+        score_ring(d, W - 150, H - 140, spec["score"], spec.get("score_label") or "运动分")
+    return im
+
+
+def daily_highlight(spec):
+    """Daily summary for a light day: today's best moment in big type, the score, one thing for tomorrow."""
+    global T
+    T = THEMES["light"]
+    if not spec.get("best") and not spec.get("summary"):
+        sys.exit("NOT_ENOUGH_DATA: daily-highlight needs best (or summary); reply in text instead")
+    im = Image.new("RGB", (W, H), tuple(int(c * 0.10 + b * 0.90) for c, b in zip(TEAL, THEMES["light"]["bg"])))
+    d = draw(im)
+    header(im, d, "每日总结")
+    d.text((48, 260), "今天最棒的一刻", font=F(30), fill=T["accent_text"])
+    lines = lines_of(d, spec.get("best") or spec.get("summary"), F(64), W - 96, 4)
+    for i, ln in enumerate(lines):
+        d.text((48, 340 + i * 90), ln, font=F(64), fill=T["ink"])
+    y = 340 + len(lines) * 90 + 60
+    if spec.get("score") is not None:
+        score_ring(d, 160, y + 120, spec["score"], "薄肌分", r=110)
+    facts = [f for f in (spec.get("facts") or [])[:2] if f]
+    for i, f in enumerate(facts):
+        d.text((330, y + 80 + i * 80), fit(d, str(f), 36, W - 380)[0], font=F(36), fill=T["ink"], anchor="lm")
+    if spec.get("tomorrow"):
+        tomorrow(d, "明天：" + spec["tomorrow"].lstrip("明天：:"))
+    return im
+
+
+def week_dots(d, y, done, today=None, plan=None):
+    done = list(done or [])[:7] + [None] * 7
+    count = sum(1 for t in done[:7] if t)
+    d.text((48, y + 20), "本周训练", font=F(30), fill=T["ink"], anchor="lm")
+    d.text((W - 48, y + 20), "%d / %s 次" % (count, plan) if plan else "%d 次" % count, font=F(30), fill=TEAL,
+           anchor="rm")
+    step = (W - 96) / 7
+    cy = y + 104
+    for i, ch in enumerate("一二三四五六日"):
+        cx, r = 48 + (i + 0.5) * step, 34
+        if done[i]:
+            d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=TEAL)
+            d.text((cx, cy), ch, font=F(24), fill=(10, 10, 10), anchor="mm")
+        else:
+            d.ellipse((cx - r, cy - r, cx + r, cy + r), outline=T["track"], width=3)
+            d.text((cx, cy), ch, font=F(24), fill=T["sub"], anchor="mm")
+        if i == today:
+            d.ellipse((cx - r - 8, cy - r - 8, cx + r + 8, cy + r + 8), outline=T["ink"], width=3)
+    return cy + 50
+
+
+def weekly(spec):
+    """Week summary (dark): training days as the hero, up to three week totals, the best moment, next week's one thing."""
+    global T
+    T = THEMES["dark"]
+    days = spec.get("days") or []
+    if not days and not spec.get("stats"):
+        sys.exit("NOT_ENOUGH_DATA: weekly needs days or stats; reply in text instead")
+    im = Image.new("RGB", (W, H), T["bg"])
+    d = draw(im)
+    header(im, d, "本周总结", on_photo=True)
+    if spec.get("range"):
+        d.text((48, 170), spec["range"], font=F(24), fill=T["sub"], anchor="lm")
+    trained = sum(1 for x in days if x.get("trained"))
+    d.text((48, 420), str(trained), font=F(240), fill=TEAL, anchor="ls")
+    d.text((48 + d.textlength(str(trained), font=F(240)) + 20, 420), "天在练", font=F(44), fill=(255, 255, 255),
+           anchor="ls")
+    y = week_dots(d, 470, [x.get("trained") for x in days], plan=spec.get("plan")) + GAP
+    stats = (spec.get("stats") or [])[:3]
+    if stats:
+        y = stat_tiles(d, y, stats) + GAP
+    if spec.get("best"):
+        d.text((48, y + 10), "本周最棒", font=F(24), fill=TEAL)
+        for i, ln in enumerate(lines_of(d, spec["best"], F(44), W - 96, 2)):
+            d.text((48, y + 70 + i * 72), ln, font=F(44), fill=T["ink"])
+    if spec.get("next"):
+        tomorrow(d, "下周：" + spec["next"].lstrip("下周：:"))
+    return im
+
+
+def weekly_bars(spec):
+    """Week summary (light): one bar per day (score, or calories when there is no score), the best moment, next week."""
+    global T
+    T = THEMES["light"]
+    days = spec.get("days") or []
+    vals = [number(x.get("score")) if x.get("score") is not None else number(x.get("kcal")) for x in days][:7]
+    if sum(1 for v in vals if v) < 2:
+        sys.exit("NOT_ENOUGH_DATA: weekly-bars needs scores or calories on at least 2 days; use weekly")
+    by_score = any(x.get("score") is not None for x in days)
+    im = Image.new("RGB", (W, H), T["bg"])
+    d = draw(im)
+    header(im, d, "本周总结")
+    if spec.get("range"):
+        d.text((48, 170), spec["range"], font=F(24), fill=T["sub"], anchor="lm")
+    d.rounded_rectangle((48, 230, W - 48, 760), R, fill=T["tile"])
+    d.text((84, 270), "每天的薄肌分" if by_score else "每天的热量（千卡）", font=F(30), fill=T["ink"], anchor="lm")
+    top_v = max(v for v in vals if v)
+    step = (W - 168) / 7
+    for i, ch in enumerate("一二三四五六日"):
+        v = vals[i] if i < len(vals) else None
+        cx = 84 + (i + 0.5) * step
+        base = 690
+        if v:
+            h = int(320 * v / top_v)
+            d.rounded_rectangle((cx - 36, base - h, cx + 36, base), 14, fill=TEAL if v == top_v else (150, 225, 215))
+            d.text((cx, base - h - 12), "%d" % v if by_score else "%.1fk" % (v / 1000), font=F(24), fill=T["ink"],
+                   anchor="ms")
+        else:
+            d.rounded_rectangle((cx - 36, base - 8, cx + 36, base), 4, fill=T["track"])
+        d.text((cx, base + 46), ch, font=F(24), fill=T["sub"], anchor="ms")
+    y = 760 + GAP
+    stats = (spec.get("stats") or [])[:3]
+    if stats:
+        y = stat_tiles(d, y, stats) + GAP
+    if spec.get("best"):
+        d.text((48, y + 10), "本周最棒", font=F(24), fill=T["accent_text"])
+        for i, ln in enumerate(lines_of(d, spec["best"], F(44), W - 96, 2)):
+            d.text((48, y + 70 + i * 72), ln, font=F(44), fill=T["ink"])
+    if spec.get("next"):
+        tomorrow(d, "下周：" + spec["next"].lstrip("下周：:"))
+    return im
+
+
 # Cards are read on a phone at about a third of their 1080 px width, so small text is raised to stay legible
 # (a 1080 px card opened full-screen is ~390 pt wide: 38 px ≈ 14 pt, the smallest text we allow). Larger sizes keep their hierarchy.
 PHONE_MIN = {20: 38, 22: 38, 24: 38, 26: 40, 28: 44, 30: 44, 32: 46, 36: 48, 38: 48, 40: 52, 42: 52, 44: 54, 52: 60, 54: 60, 60: 68, 64: 72}
@@ -746,6 +990,12 @@ def phone_fonts(load):
         return load(PHONE_MIN.get(size, max(size, 38)))
 
     return F
+
+
+RENDER = {"meal": meal, "meal-split": meal_split, "meal-polaroid": meal_polaroid, "workout": workout,
+          "workout-poster": workout_poster, "workout-list": workout_list, "daily-nutrition": daily_nutrition,
+          "daily-timeline": daily_timeline, "daily-workout": daily_workout, "daily-highlight": daily_highlight,
+          "weekly": weekly, "weekly-bars": weekly_bars}
 
 
 def layout_problems():
@@ -785,8 +1035,7 @@ def main():
     from PIL import Image, ImageDraw, ImageFont  # noqa: F811
 
     F = phone_fonts(font_loader())
-    render = {"meal": meal, "workout": workout, "daily-nutrition": daily_nutrition,
-              "daily-timeline": daily_timeline, "daily-workout": daily_workout}[kind]
+    render = RENDER[kind]
     del LAYOUT[:]
     render(clean(spec)).save(out, optimize=True)
     problems = layout_problems()
