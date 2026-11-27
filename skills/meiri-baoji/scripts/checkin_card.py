@@ -245,7 +245,9 @@ SPORT_GROUPS = {"strength": "strength", "力量": "strength", "攀岩": "strengt
                 "划船": "cycle", "swim": "swim", "游泳": "swim", "yoga": "yoga", "瑜伽": "yoga", "pilates": "yoga",
                 "普拉提": "yoga", "stretch": "yoga", "拉伸": "yoga", "hiit": "hiit", "跳绳": "hiit", "jump rope": "hiit",
                 "crossfit": "hiit", "walk": "walk", "步行": "walk", "散步": "walk", "hike": "walk", "徒步": "walk",
-                "爬山": "walk"}
+                "爬山": "walk", "腿日": "strength", "胸日": "strength", "背日": "strength", "肩": "strength",
+                "练腿": "strength", "深蹲": "strength", "卧推": "strength", "硬拉": "strength", "撸铁": "strength",
+                "健身房": "strength"}
 MEAL_GROUPS = (("breakfast", ("早",)), ("lunch", ("午",)), ("dinner", ("晚", "夜宵")),
                ("snack", ("加餐", "零食", "水果", "下午茶", "奶茶", "饮")))
 
@@ -527,6 +529,10 @@ def story_daily(spec):
         facts.append((shown(total_min), works[0][0] if len(works) == 1 else "运动", "分钟"))
     elif works and not total_min:
         facts.append((works[0][0], "运动", ""))
+    rank = spec.get("rank")  # leaderboard place today, e.g. 3 or "3/120"
+    rank = str(rank).strip() if rank not in (None, "") else ""
+    if rank:
+        facts.insert(0, ("第%s" % rank.split("/")[0], "榜上排名", "名"))
     rows = []
     if kcal or protein:
         rows.append(("吃", " · ".join(filter(None, ["%s 千卡" % shown(kcal) if kcal else "",
@@ -535,13 +541,15 @@ def story_daily(spec):
         rows.append(("练", work_txt))
     if score is not None:
         rows.append(("分", "薄肌分 %s" % shown(score) + ("（比昨天 %s）" % spec["delta"] if spec.get("delta") else "")))
+    if rank:
+        rows.append(("榜", "排行榜第 %s 名" % rank.split("/")[0]))
     wk = spec.get("week") if isinstance(spec.get("week"), dict) else None
     return dict(kicker="%d月%d日 周%s" % (mon, day, wd), mast=("%d" % day, "%d月 · 周%s" % (mon, wd), "今日复盘"),
                 hero=hero, ring=(score, "薄肌分" + (" " + spec["delta"] if spec.get("delta") else ""))
                 if score is not None else None,
                 kcal=(shown(kcal), goal and kcal / goal, "目标 " + shown(goal) if goal else "") if kcal else None,
                 head=spec.get("summary") or "", facts=facts[:3], bars=macros[:3], rows=rows,
-                list=[(n, "%s 分钟" % shown(mi) if mi else "") for n, mi in works],
+                list=[(n, "%s 分钟" % shown(mi) if mi else "") for n, mi in works] + ([("排行榜", "第 %s 名" % rank.split("/")[0])] if rank else []),
                 foot=("明天", re.sub(r"^明天[：:\s]*", "", spec["tomorrow"])) if spec.get("tomorrow") else None,
                 week=dict(done=wk.get("done"), plan=wk.get("plan")) if wk else None, photos=load_photos(spec),
                 tag="今日复盘")

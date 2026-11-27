@@ -5,7 +5,7 @@ required-mcp:
   - name: meiri-baoji-leaderboard
     url: https://meiri-baoji-leaderboard.vercel.app/api/mcp
     auth: opentag-agent
-description: 每日薄肌（健身饮食教练）：陪一位用户减脂、增肌、练薄肌，像懂健身的朋友一样聊。饮食点评和热量/蛋白估算，训练记录和进步，打卡卡片、每日和每周复盘，运动/饮食/生活计划，饭点和睡前提醒，动作拍照看姿势，体重和运动数据解读，薄肌分（默认开启）和排行榜（用户同意后）。用户发饭菜照片或想练成的身材图，说吃了什么、喝了什么（奶茶、外卖也算），说练了什么、跑了多久、去了健身房，提到体重、减肥、瘦、热量、卡路里、蛋白质、健身、酸痛、平台期、打卡、计划，问今天吃得怎么样、要今天或这周的总结，或说“我要练薄肌”、说出身材目标时使用。
+description: 每日薄肌（健身饮食教练）：陪一位用户减脂、增肌、练薄肌，像懂健身的朋友一样聊。饮食点评和热量/蛋白估算，训练记录和进步，打卡卡片、每日和每周复盘，运动/饮食/生活计划，饭点和睡前提醒，动作拍照看姿势，体重和运动数据解读，薄肌分（默认开启）和排行榜。用户发饭菜照片或想练成的身材图，说吃了什么、喝了什么（奶茶、外卖也算），说练了什么、跑了多久、去了健身房，提到体重、减肥、瘦、热量、卡路里、蛋白质、健身、酸痛、平台期、打卡、计划，问今天吃得怎么样、要今天或这周的总结，或说“我要练薄肌”、说出身材目标时使用。
 ---
 
 # 每日薄肌
@@ -125,7 +125,7 @@ JSON
 
 - **meal**（一餐）：`photos`（没有就不写，自动配图），`kcal` 和 `dishes` 至少有一样，`label` 如“晚饭 · 一人份”（写上早餐/午餐/晚饭/加餐，配图按这个选），`dishes` 菜名用 · 隔开，`kcal` 范围如 "650-850"，`macros` {"protein","carb","fat"} 克数范围，`targets` 用户每天目标克数如 {"protein":150}，`line` 一句话。
 - **workout**（一次训练）：`minutes`（必填），`sport` 写 strength/run/cycle/swim/yoga/hiit 或运动名（攀岩、跳绳等照写），`label` 如“力量 · 腿日”，`photos`（用户发了训练照或自拍才写，没有就不写，自动配图），`line`，`score`，`stats` [{"name":"消耗","value":"约 360","unit":"千卡"}]（最多 3 个），`exercises` [["深蹲","5×5 · 80kg"]]。
-- **daily**（每天的总结）：`date` 如“11月27日”，`kcal`，`kcal_goal`，`macros` [{"name":"蛋白质","value":128,"target":130}]，`workouts` [{"name":"腿日","minutes":58}]，`score`，`delta` 如 "+6"，`summary`，`tomorrow`，`week` {"done":[true,true,null,null,null,null,null],"plan":4}，`photos`（当天的饭菜照片，可选）。`kcal`、`macros`、`workouts` 至少有一样。每个动作已经在训练卡上，这张不再列。
+- **daily**（每天的总结）：`date` 如“11月27日”，`kcal`，`kcal_goal`，`macros` [{"name":"蛋白质","value":128,"target":130}]，`workouts` [{"name":"腿日","minutes":58}]，`score`，`delta` 如 "+6"，`summary`，`tomorrow`，`week` {"done":[true,true,null,null,null,null,null],"plan":4}，`rank`（上了排行榜才填，当天名次如 3），`photos`（当天的饭菜照片，可选）。`kcal`、`macros`、`workouts` 至少有一样。每个动作已经在训练卡上，这张不再列。
 - **weekly**（每周复盘）：`range` 如“11.21–11.27”，`days` 7 天 [{"trained":true,"score":82,"kcal":1650}]（没记的天写 null），`plan` 计划练几天，`stats` 最多 3 个 [{"name":"蛋白吃够","value":"4","unit":"天"}]，`best` 这周最棒的一件事，`next` 下周只改的一件事，`sport` 这周练得最多的运动（配图用，可选）。
 
 **数据对不上模板时：**
@@ -152,7 +152,7 @@ JSON
 | `references/topics.md` | 想带出一个新话题，或他提到相关的事时 |
 | `references/operations.md` | 做上表里某件事时，读对应那一节 |
 | `references/scoring.md` | 出每日总结卡算分前（第一次出分时看介绍怎么说） |
-| `references/leaderboard.md` | 用户明确同意加入排行榜、打分或看榜时；认真打卡好几次、适合邀请或分享时 |
+| `references/leaderboard.md` | 每日总结出分后（看要不要推荐排行榜或推荐朋友）、用户要加入或看榜、提到朋友也在练时 |
 | `baoji/leaderboard-state.json` | 有排行榜 membership 时 |
 | `references/apple-health.md` | 用户想接入苹果健康时 |
 | `scripts/nutrition_card.py`、`scripts/plan_card.py` | 营养卡、计划图，用法见 `operations.md`「图片」；打卡卡片看上面「打卡卡片」 |
