@@ -863,24 +863,83 @@ def style_a(st):
 # ---------- style B: magazine page on cream ----------
 
 def b_list(d, x0, x1, y, rows, two_col, rh):
-    """List without numbers or rules (spacing separates the rows); names-only lists of 4+ go in two columns."""
+    """Numbered list without rules (spacing separates the rows); names-only lists of 4+ go in two columns."""
     if two_col:
         cw = (x1 - x0) / 2
         for i, (k, _) in enumerate(rows):
             r, c = i // 2, i % 2
             cy = y + r * rh + rh / 2
             x = x0 + c * cw
-            txt(d, (x, cy), fit(d, k, 42, cw - 24)[0], 42, INK, "lm", bold=True)
+            txt(d, (x, cy), "%02d" % (i + 1), 38, TEAL, "lm", bold=True)
+            txt(d, (x + 70, cy), fit(d, k, 42, cw - 90)[0], 42, INK, "lm", bold=True)
         return y + ((len(rows) + 1) // 2) * rh
     for i, (k, v) in enumerate(rows):
         cy = y + i * rh + rh / 2
+        txt(d, (x0, cy), "%02d" % (i + 1), 38, TEAL, "lm", bold=True)
         vw = 0
         if v:
             vt = fit(d, v, 40, (x1 - x0) * 0.42)[0]
             txt(d, (x1, cy), vt, 40, TEAL, "rm")
             vw = tw(d, vt, 40) + 24
-        txt(d, (x0, cy), fit(d, k, 42, x1 - x0 - vw)[0], 42, INK, "lm", bold=True)
+        txt(d, (x0 + 70, cy), fit(d, k, 42, x1 - x0 - 70 - vw)[0], 42, INK, "lm", bold=True)
     return y + len(rows) * rh
+
+
+def style_b_meal(st):
+    """Cream meal page: what was eaten in big type on its photo, the sentence under it; below, the calories as one
+    big number beside a short macro list."""
+    im = Image.new("RGB", (W, H), CREAM)
+    d = draw(im)
+    big, s1, s2 = st["mast"]
+    brand_chip(im, W - 56, 48)
+    bs = 104
+    while bs > 60 and tw(d, big, bs) > 420:
+        bs -= 8
+    w = txt(d, (56, 150), big, bs, TEAL, "ls", bold=True)
+    tail = " · ".join(x for x in (s1, s2) if x)
+    txt(d, (56 + w + 24, 150), fit(d, tail, 44, W - 112 - w - 24)[0], 44, INK, "ls")
+    d.rectangle((56, 177, W - 56, 179), fill=INK)
+    macros = [(lab, v) for v, lab, _ in st.get("facts") or [] if v][:3]
+    kcal = st["hero"][1]
+    # numbers: calories left (big), macros right (label · value per line)
+    nh = max(240, len(macros) * 66 + 40)
+    top, bottom = 200, H - 40
+    p = bottom - top - nh - 36
+    collage(im, (56, top, W - 56, top + p), st["photos"], r=10, gap=12, plus_top=True)
+    dl = item_lines(d, st.get("sub") or "", 64, W - 192, 2) if st.get("sub") else []
+    ds = 64
+    hl = lines_of(d, st.get("head") or "", 40, W - 192, 2) if st.get("head") else []
+    over = len(dl) * 84 + (16 if dl and hl else 0) + len(hl) * 56
+    if over:
+        sh = over + 160
+        g = Image.new("L", (1, sh))
+        for i in range(sh):
+            g.putpixel((0, i), int(225 * min(1, i / (sh * 0.65))))
+        from PIL import ImageChops
+
+        mask = ImageChops.multiply(g.resize((W - 112, sh)), round_mask(W - 112, p, 10).crop((0, p - sh, W - 112, p)))
+        im.paste(Image.new("RGB", (W - 112, sh), (0, 0, 0)), (56, int(top + p - sh)), mask)
+        ty = top + p - over - 36
+        for line in dl:
+            txt(d, (96, ty + 42), line, ds, WHITE, "lm", bold=True)
+            ty += 84
+        ty += 16 if dl and hl else 0
+        for line in hl:
+            txt(d, (96, ty + 28), line, 40, (228, 228, 228), "lm")
+            ty += 56
+    y = top + p + 36
+    split = W - 56 - (380 if macros else 0)
+    txt(d, (56, y + 30), "热量 · 千卡", 40, (120, 116, 110), "lm")
+    v, vs = fit(d, kcal, 150, split - 56 - 40, 72)
+    txt(d, (52, y + 84 + vs * 0.74), v, vs, TEAL, "ls", bold=True)
+    if macros:
+        my = y + (nh - len(macros) * 66) / 2
+        for lab, mv in macros:
+            txt(d, (split, my + 33), lab, 40, (120, 116, 110), "lm")
+            mt, ms = fit(d, mv, 52, 380 - tw(d, lab, 40) - 30, 40)
+            txt(d, (W - 56, my + 33), mt, ms, INK, "rm", bold=True)
+            my += 66
+    return im
 
 
 def style_b_photo(st):
@@ -978,6 +1037,8 @@ def style_b_photo(st):
 
 
 def style_b(st):
+    if st.get("kind") == "meal" and st.get("photos") and st.get("hero"):
+        return style_b_meal(st)
     if st.get("photos"):
         return style_b_photo(st)
     im = Image.new("RGB", (W, H), CREAM)
@@ -1098,16 +1159,17 @@ def style_b(st):
     big_rows = rh >= 150
     for i, (k, v) in enumerate(rows_shown):
         cy = y + rh / 2
+        txt(d, (56, cy), "%02d" % (i + 1), 44, TEAL, "lm", bold=True)
         size = 60 if big_rows else 48
         if v:
-            kw = txt(d, (56, cy), fit(d, k, size, 400)[0], size, INK, "lm", bold=True)
-            vt, vs = fit(d, v, 60 if big_rows else 44, W - 56 - (56 + kw + 32), MIN_PX)
-            txt(d, (56 + kw + 32, cy), vt, vs, TEAL if big_rows else INK, "lm", bold=big_rows)
+            kw = txt(d, (150, cy), fit(d, k, size, 300)[0], size, INK, "lm", bold=True)
+            vt, vs = fit(d, v, 60 if big_rows else 44, W - 56 - (150 + kw + 32), MIN_PX)
+            txt(d, (150 + kw + 32, cy), vt, vs, TEAL if big_rows else INK, "lm", bold=big_rows)
         else:
-            txt(d, (56, cy), fit(d, k, size, W - 112)[0], size, INK, "lm", bold=True)
+            txt(d, (150, cy), fit(d, k, size, W - 220)[0], size, INK, "lm", bold=True)
         y += rh
     if hidden:
-        txt(d, (56, y + rh / 2), "还有 %d 项" % hidden, 44, (120, 116, 110), "lm")
+        txt(d, (150, y + rh / 2), "还有 %d 项" % hidden, 44, (120, 116, 110), "lm")
         y += rh
     if foot:
         d.rectangle((0, H - 150, W, H), fill=INK)
