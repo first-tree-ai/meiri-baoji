@@ -683,12 +683,12 @@ def value_unit(d, x, base, v, unit, size, width, ink, unit_ink, min_size=46):
 
 
 def fact_row(d, facts, size, width, label_size, min_size=46):
-    """Facts side by side get one number size: a word unit moves into the label ("热量（千卡）") when it fits there,
+    """Facts side by side get one number size: a word unit moves into the label ("热量 · 千卡") when it fits there,
     and every number takes the size the widest one fits at. Returns (facts, size)."""
     out = []
     for v, lab, u in facts:
         if u and not u.isascii() and len(u) >= 2:
-            joined = "%s（%s）" % (lab, u) if lab else u
+            joined = "%s · %s" % (lab, u) if lab else u
             if tw(d, joined, label_size) <= width:
                 lab, u = joined, ""
         out.append((v, lab, u))
