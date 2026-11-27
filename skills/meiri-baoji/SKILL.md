@@ -130,7 +130,7 @@ JSON
 
 每种卡都写 `style`（"A"/"B"/"C"）；有照片就写 `photos`（路径列表）。
 
-- **meal**（一餐）：`photos`（没有就不写，自动配图），`kcal` 和 `dishes` 至少有一样，`label` 如“晚饭 · 一人份”（写上早餐/午餐/晚饭/加餐，配图按这个选），`dishes` 菜名用 · 隔开，`kcal` 范围如 "650-850"，`macros` {"protein","carb","fat"} 克数范围，`targets` 用户每天目标克数如 {"protein":150}，`line` 一句话。
+- **meal**（一餐）：`photos`（没有就不写，自动配图），`kcal` 和 `dishes` 至少有一样，`label` 如“晚饭 · 一人份”（写上早餐/午餐/晚饭/加餐，配图按这个选），`dishes` 菜名用 · 隔开，份量跟在自己菜名后面、不单独成一项（“方形慕斯蛋糕 3小块 · 美式咖啡”，不要“方形慕斯蛋糕 · 3小块”），`kcal` 范围如 "650-850"，`macros` {"protein","carb","fat"} 克数范围，`targets` 用户每天目标克数如 {"protein":150}，`line` 一句话。
 - **workout**（一次训练）：`minutes`（必填），`sport` 写 strength/run/cycle/swim/yoga/hiit 或运动名（攀岩、跳绳等照写），`label` 如“力量 · 腿日”，`photos`（用户发了训练照或自拍才写，没有就不写，自动配图），`line`，`score`，`stats` [{"name":"消耗","value":"约 360","unit":"千卡"}]（最多 3 个），`exercises` [["深蹲","5×5 · 80kg"]]。
 - **daily**（每天的总结）：`date` 如“11月27日”，`kcal`，`kcal_goal`，`macros` [{"name":"蛋白质","value":128,"target":130}]，`workouts` [{"name":"腿日","minutes":58}]，`score`，`delta` 如 "+6"，`summary`，`tomorrow`，`week` {"done":[true,true,null,null,null,null,null],"plan":4}，`rank`（上了排行榜才填，当天名次如 3），`photos`（当天的饭菜照片，可选）。`kcal`、`macros`、`workouts` 至少有一样。每个动作已经在训练卡上，这张不再列。
 - **weekly**（每周复盘）：`range` 如“11.21–11.27”，`days` 7 天 [{"trained":true,"score":82,"kcal":1650}]（没记的天写 null），`plan` 计划练几天，`stats` 最多 3 个 [{"name":"蛋白吃够","value":"4","unit":"天"}]，`best` 这周最棒的一件事，`next` 下周只改的一件事，`sport` 这周练得最多的运动（配图用，可选）。

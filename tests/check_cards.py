@@ -39,6 +39,8 @@ def cases(tmp):
                                         "dishes": "【招牌】双拼饭·黑椒牛柳+照烧鸡腿肉（加量版）配溏心蛋、西兰花、玉米粒 + 冰美式（大杯 不加糖）",
                                         "kcal": "8000-12500 kJ", "macros": {"protein": "135-180", "carb": "约350", "fat": "1200"},
                                         "targets": {"protein": 90}, "line": long_text}
+    yield "meal-portion-wide", "meal", {"label": "下午茶 · 轻松时刻", "dishes": "方形慕斯蛋糕、3小块", "kcal": "1200-1500",
+                                        "macros": {"protein": "45-60", "carb": "150-180", "fat": "40-55"}}
     yield "meal-minimal", "meal", {"photo": p[1], "kcal": "300 大卡"}
     yield "meal-photo-only-3", "meal", {"photos": p[:3]}
     yield "workout-normal", "workout", {"sport": "strength", "label": "力量 · 腿日", "line": "深蹲又多了 5kg，\n腿在变强。",

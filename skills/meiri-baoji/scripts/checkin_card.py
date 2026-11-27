@@ -447,6 +447,23 @@ def need(cond, msg):
         sys.exit("NOT_ENOUGH_DATA: " + msg + "; reply in text instead")
 
 
+PORTION = re.compile(r"^(约|大约|大概|各)?\s*([\d.]+|[一二两三四五六七八九十半几]+)\s*(小|大|中)?\s*"
+                     r"(块|片|个|碗|杯|份|盘|勺|根|只|颗|粒|串|条|张|瓶|盒|袋|罐|口|碟|克|g|G|ml|mL|毫升|斤|两)"
+                     r"[\s左右多]*$|^(少量|少许|一点|一点点|半份|小份|大份|一人份)$")
+
+
+def dish_list(text):
+    """Dishes split on · 、 , + /; an amount on its own ("3小块", "200g") stays with the dish before it."""
+    out = []
+    for x in re.split(r"[·、，,+＋/]", str(text or "")):
+        x = x.strip()
+        if x and out and PORTION.match(x):
+            out[-1] += " " + x
+        elif x:
+            out.append(x)
+    return out
+
+
 def story_meal(spec):
     photos = load_photos(spec)
     need(photos or spec.get("kcal") or spec.get("dishes"), "meal needs a photo, kcal or dishes")
@@ -462,7 +479,7 @@ def story_meal(spec):
             bars.append((name, g_text(m[key]), number(m[key]) / goal if goal and number(m[key]) else None))
     label = (spec.get("label") or "").strip()
     word = label.split("·")[0].strip() if label else ""
-    dishes = [x.strip() for x in re.split(r"[·、，,+＋/]", spec.get("dishes") or "") if x.strip()]
+    dishes = dish_list(spec.get("dishes"))
     head = spec.get("line") or ""
     return dict(kicker=label or "这一餐", mast=(word if 0 < len(word) <= 3 else "这一餐",
                                                label[len(word):].strip(" ·") if word else "", "饮食打卡"),
@@ -647,16 +664,35 @@ def week_bars(d, box, values, done, fill, rest, label_ink):
         txt(d, (cx, y1 - 22), ch, MIN_PX, label_ink, "mm")
 
 
-def value_unit(d, x, base, v, unit, size, width, ink, unit_ink, min_size=46):
-    """A big value with its unit in small type after it; the value shrinks first, then the unit goes."""
+def value_fit(d, v, unit, size, width, min_size=46):
+    """(value, size, unit) for a big value with its unit in small type after it; the value shrinks first, then the
+    unit goes."""
     uw = tw(d, unit, 40) + 10 if unit else 0
     v, vs = fit(d, v, size, width - uw, min_size)
     if unit and (tw(d, v, vs) + uw > width or v.endswith("…")):
-        unit, uw = "", 0
+        unit = ""
         v, vs = fit(d, v, size, width, min_size)
+    return v, vs, unit
+
+
+def value_unit(d, x, base, v, unit, size, width, ink, unit_ink, min_size=46):
+    v, vs, unit = value_fit(d, v, unit, size, width, min_size)
     w = txt(d, (x, base), v, vs, ink, "ls", bold=True)
     if unit:
         txt(d, (x + w + 10, base), unit, 40, unit_ink, "ls")
+
+
+def fact_row(d, facts, size, width, label_size, min_size=46):
+    """Facts side by side get one number size: a word unit moves into the label ("热量（千卡）") when it fits there,
+    and every number takes the size the widest one fits at. Returns (facts, size)."""
+    out = []
+    for v, lab, u in facts:
+        if u and not u.isascii() and len(u) >= 2:
+            joined = "%s（%s）" % (lab, u) if lab else u
+            if tw(d, joined, label_size) <= width:
+                lab, u = joined, ""
+        out.append((v, lab, u))
+    return out, min(value_fit(d, v, u, size, width, min_size)[1] for v, _, u in out)
 
 
 def pill(d, x, base, text, size, fill, ink):
@@ -811,12 +847,13 @@ def style_a(st):
         ty += 170
     elif facts:
         cw = (W - 64 - 48) / len(facts)
+        small = fact_h < 190
+        facts, vs = fact_row(d, facts, 80 if small else 96, cw - 40, 40 if small else 44)
         for i, (v, lab, u) in enumerate(facts):
             x = 56 + 24 + i * cw
             if i:
                 d.line((x - 12, ty + 10, x - 12, ty + 170), fill=(60, 66, 68), width=3)
-            small = fact_h < 190
-            value_unit(d, x + 16, ty + (80 if small else 96), v, u, 80 if small else 96, cw - 40, WHITE, GREY)
+            value_unit(d, x + 16, ty + (80 if small else 96), v, u, vs, cw - 40, WHITE, GREY, vs)
             txt(d, (x + 16, ty + (134 if small else 160)), fit(d, lab, 40 if small else 44, cw - 40)[0],
                 40 if small else 44, TEAL, "ls")
         ty += fact_h
@@ -876,7 +913,7 @@ def style_b_photo(st):
     facts = [] if st.get("kind") in ("daily", "weekly") else [f for f in st.get("facts_ab") or st.get("facts") or []
                                                             if f[0]][:3]
     if st.get("kind") == "meal" and st.get("hero"):
-        facts = [(st["hero"][1], "热量 · 千卡", "")] + facts[:2]
+        facts = [(st["hero"][1], "热量", "千卡")] + facts[:2]
     shown_rows = rows[:6]
     hidden = len(rows) - len(shown_rows) + more
     if hidden:
@@ -919,19 +956,21 @@ def style_b_photo(st):
             ty += 70
         if facts_on_photo:
             cw = (W - 192) / len(facts)
+            facts, vs = fact_row(d, facts, 64, cw - 24, 38)
             for i, (v, lab, u) in enumerate(facts):
                 x = 96 + i * cw
-                value_unit(d, x, ty + 78, v, u, 64, cw - 24, TEAL if i == 0 else WHITE, (210, 210, 210))
+                value_unit(d, x, ty + 78, v, u, vs, cw - 24, TEAL if i == 0 else WHITE, (210, 210, 210), vs)
                 txt(d, (x, ty + 126), fit(d, lab, 38, cw - 24)[0], 38, (210, 210, 210), "ls")
     y += p + 20
     if fh:
         d.line((56, y, W - 56, y), fill=RULE, width=3)
         cw = (W - 112) / len(facts)
+        facts, vs = fact_row(d, facts, 64, cw - 48, 38)
         for i, (v, lab, u) in enumerate(facts):
             x = 56 + i * cw
             if i:
                 d.line((x, y + 24, x, y + fh - 24), fill=RULE, width=3)
-            value_unit(d, x + (24 if i else 0), y + 80, v, u, 64, cw - 48, TEAL, INK)
+            value_unit(d, x + (24 if i else 0), y + 80, v, u, vs, cw - 48, TEAL, INK, vs)
             txt(d, (x + (24 if i else 0), y + 130), fit(d, lab, 38, cw - 48)[0], 38, INK, "ls")
         y += fh + 20
     if wh:
@@ -1054,11 +1093,12 @@ def style_b(st):
     if fh:
         d.line((56, y, W - 56, y), fill=RULE, width=3)
         cw = (W - 112) / len(facts)
+        facts, vs = fact_row(d, facts, 76, cw - 48, 40)
         for i, (v, lab, u) in enumerate(facts):
             x = 56 + i * cw
             if i:
                 d.line((x, y + 30, x, y + fh - 30), fill=RULE, width=3)
-            value_unit(d, x + (24 if i else 0), y + 104, v, u, 76, cw - 48, TEAL, INK)
+            value_unit(d, x + (24 if i else 0), y + 104, v, u, vs, cw - 48, TEAL, INK, vs)
             txt(d, (x + (24 if i else 0), y + 160), fit(d, lab, 40, cw - 48)[0], 40, INK, "ls")
         y += fh
         d.line((56, y, W - 56, y), fill=RULE, width=3)
@@ -1203,13 +1243,18 @@ def style_c(st):
         elif name in ("bars", "facts"):
             items = bars if name == "bars" else facts
             cw = (x1 - x0 - G * (len(items) - 1)) / len(items)
+            if name == "facts":
+                items, fs = fact_row(d, items, 80, cw - 56, 40)
+            else:  # every macro number at the size the widest one fits at
+                bsz = (56 if any(f is not None for _, _, f in items) else 64) if h < 220 else 76
+                bsz = min(fit(d, v, bsz, cw - 60, 40)[1] for _, v, _ in items)
             for i, it in enumerate(items):
                 tx0 = x0 + i * (cw + G)
                 tile(d, (tx0, y, tx0 + cw, y + h))
                 if name == "bars":
                     n, v, frac = it
                     txt(d, (tx0 + 30, y + (44 if h < 220 else 56)), fit(d, n, 40, cw - 60)[0], 40, GREY, "lm")
-                    v, vs = fit(d, v, (56 if frac is not None else 64) if h < 220 else 76, cw - 60, 40)
+                    v, vs = fit(d, v, bsz, cw - 60)
                     if h < 220:
                         vb = y + h - (52 if frac is not None else 34)
                     else:
@@ -1220,7 +1265,7 @@ def style_c(st):
                             18 if h < 220 else 24)
                 else:
                     v, lab, u = it
-                    value_unit(d, tx0 + 28, y + h / 2 + 14, v, u, 80, cw - 56, WHITE if i else TEAL, GREY)
+                    value_unit(d, tx0 + 28, y + h / 2 + 14, v, u, fs, cw - 56, WHITE if i else TEAL, GREY, fs)
                     txt(d, (tx0 + 30, y + h / 2 + 70), fit(d, lab, 40, cw - 60)[0], 40, GREY, "ls")
         elif name == "list":
             tile(d, b)
