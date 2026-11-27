@@ -17,7 +17,7 @@ import os
 import re
 import sys
 
-from _common import font_loader, require_pillow, wrap
+from _common import NO_LINE_START, font_loader, require_pillow
 
 USAGE = __doc__
 KINDS = ("meal", "workout", "daily", "weekly")
@@ -107,12 +107,30 @@ def fit(d, text, size, width, min_size=MIN_PX):
     return text, size
 
 
+def wrap(d, text, font, width):
+    """Wrap CJK text; numbers and Latin words (70kg, 4×8) never break across lines."""
+    lines, cur = [], ""
+    for tok in re.findall(r"[0-9A-Za-z.,%+×/:~–-]+|\n|.", str(text)):
+        if tok == "\n":
+            lines.append(cur)
+            cur = ""
+        elif cur and tok[0] not in NO_LINE_START and d.textlength(cur + tok, font=font) > width:
+            lines.append(cur)
+            cur = tok
+        else:
+            cur += tok
+    if cur:
+        lines.append(cur)
+    return lines
+
+
 def lines_of(d, text, size, width, limit):
     """At most limit lines; a cut-off text ends in "…" instead of stopping mid-sentence."""
     font = F(size)
     lines = wrap(d, text, font, width)
     # No one- or two-character widow on the last line: carry two characters down with it.
-    if len(lines) >= 2 and len(lines[-1]) <= 2 and len(lines[-2]) > 4 and "\n" not in str(text)[-4:]:
+    if (len(lines) >= 2 and len(lines[-1]) <= 2 and len(lines[-2]) > 4 and "\n" not in str(text)[-4:]
+            and not re.search(r"[0-9A-Za-z]", lines[-2][-3:])):
         lines[-2], lines[-1] = lines[-2][:-2], lines[-2][-2:] + lines[-1]
     if len(lines) <= limit:
         return lines
@@ -346,7 +364,7 @@ def g_text(value):
 # kicker  top-left line            mast   (big word, small line, bold line) for the magazine masthead
 # hero    (label, value, unit, pill) the main number     ring   score 0–100 (dashboard)
 # head    the one sentence          sub    second line under it (poster)
-# facts   [(value, label)] ≤3        bars   [(name, value, frac)] macros with a goal (dashboard)
+# facts   [(value, label, unit)] ≤3        bars   [(name, value, frac)] macros with a goal (dashboard)
 # rows    [(key, text)] list         more   hidden rows count          foot   ("明天", text)
 # week    {"done": [7], "values": [7], "plan"}                         photos [(img, focus, sharpness)]
 
@@ -370,7 +388,7 @@ def story_meal(spec):
     facts, bars = [], []
     for key, name in MACROS:
         if m.get(key) not in (None, ""):
-            facts.append((g_text(m[key]), name))
+            facts.append((g_text(m[key]), name, ""))
             goal = number(tg.get(key))
             bars.append((name, g_text(m[key]), number(m[key]) / goal if goal and number(m[key]) else None))
     label = (spec.get("label") or "").strip()
@@ -396,7 +414,7 @@ def story_workout(spec):
     for x in stats[:3]:
         unit = x.get("unit") or x.get("sub") or ""
         unit = "" if str(unit).startswith("+") else unit
-        facts.append((shown(x.get("value"), unit), "%s（%s）" % (x.get("name", ""), unit) if unit else x.get("name", "")))
+        facts.append((shown(x.get("value"), unit), x.get("name", ""), unit))
     rows = []
     for row in spec.get("exercises") or []:
         if isinstance(row, (list, tuple)):
@@ -411,7 +429,7 @@ def story_workout(spec):
     return dict(kicker=name, mast=(shown(minutes), "分钟", name), hero=("今天练了", shown(minutes), "分钟", None),
                 ring=(score, spec.get("score_label") or "运动分") if score is not None else None,
                 head=spec.get("line") or "", facts=facts,
-                facts_ab=facts[:2] + ([(shown(score), "运动分")] if score is not None else facts[2:3]),
+                facts_ab=facts[:2] + ([(shown(score), "运动分", "")] if score is not None else facts[2:3]),
                 rows=rows, more=int(number(spec.get("more")) or 0), photos=load_photos(spec),
                 list=[(k, v) for k, v in rows])
 
@@ -461,13 +479,13 @@ def story_daily(spec):
         hero = ("今天练了", shown(total_min), "分钟", None) if total_min else None
     facts = []
     if kcal and hero and hero[2] != "千卡":
-        facts.append((shown(kcal), "千卡"))
+        facts.append((shown(kcal), "热量", "千卡"))
     if protein:
-        facts.append((protein, "蛋白质"))
+        facts.append((protein, "蛋白质", ""))
     if total_min and not (hero and hero[2] == "分钟"):
-        facts.append((shown(total_min), "分钟" + (works[0][0] if len(works) == 1 else "运动")))
+        facts.append((shown(total_min), works[0][0] if len(works) == 1 else "运动", "分钟"))
     elif works and not total_min:
-        facts.append((works[0][0], "运动"))
+        facts.append((works[0][0], "运动", ""))
     rows = []
     if kcal or protein:
         rows.append(("吃", " · ".join(filter(None, ["%s 千卡" % shown(kcal) if kcal else "",
@@ -503,12 +521,10 @@ def story_weekly(spec):
     facts = []
     for x in (spec.get("stats") or [])[:3]:
         if isinstance(x, dict):
-            facts.append((shown(x.get("value"), x.get("unit") or ""),
-                          "%s（%s）" % (x.get("name", ""), x["unit"]) if x.get("unit") else x.get("name", "")))
+            facts.append((shown(x.get("value"), x.get("unit") or ""), x.get("name", ""), x.get("unit") or ""))
     rng = str(spec.get("range") or "").strip()
     rows = [("练", "%d 天" % trained + (" / 计划 %d 天" % plan if plan else ""))]
-    rows += [(lab.split("（")[0][:2], "%s %s" % (lab, v) if not lab.endswith("）") else "%s %s" % (v, lab[lab.index("（") + 1:-1]))
-             for v, lab in facts]
+    rows += [(lab, ("%s %s" % (v, u)).strip()) for v, lab, u in facts]
     return dict(kicker=("%s · " % rng if rng else "") + "本周复盘", mast=("%d" % trained, "天在练",
                                                                          rng or "本周复盘"),
                 hero=("这周练了", "%d" % trained, "天", "计划 %d" % plan if plan else None), head=spec.get("best") or "",
@@ -554,6 +570,18 @@ def week_bars(d, box, values, done, fill, rest, label_ink):
         txt(d, (cx, y1 - 22), ch, MIN_PX, label_ink, "mm")
 
 
+def value_unit(d, x, base, v, unit, size, width, ink, unit_ink, min_size=46):
+    """A big value with its unit in small type after it; the value shrinks first, then the unit goes."""
+    uw = tw(d, unit, 40) + 10 if unit else 0
+    v, vs = fit(d, v, size, width - uw, min_size)
+    if unit and tw(d, v, vs) + uw > width:
+        unit, uw = "", 0
+        v, vs = fit(d, v, size, width, min_size)
+    w = txt(d, (x, base), v, vs, ink, "ls", bold=True)
+    if unit:
+        txt(d, (x + w + 10, base), unit, 40, unit_ink, "ls")
+
+
 def pill(d, x, base, text, size, fill, ink):
     w = tw(d, text, size) + size
     d.rounded_rectangle((x, base - size * 1.55, x + w, base - size * 0.1), size, fill=fill)
@@ -570,6 +598,8 @@ def style_a(st):
     facts = st.get("facts_ab") or st.get("facts") or []
     facts = [f for f in facts if f[0]][:3]
     foot = st.get("foot")
+    if not facts and not foot and not st.get("photos") and st.get("kicker"):
+        facts = [(st["kicker"], "", "")]
     # dark panel at the bottom: facts, then the foot line
     panel_h = (190 if len(facts) > 1 else 170 if facts else 0) + (110 if foot else 0)
     panel_h = panel_h + 60 if panel_h else 0
@@ -643,19 +673,20 @@ def style_a(st):
     mark("box", (32, panel_top, W - 32, H - 32))
     ty = panel_top + 40
     if len(facts) == 1:
-        v, lab = facts[0]
+        v, lab, u = facts[0]
+        lab = (u + lab) if u and lab else (u or lab)
         v, vs = fit(d, v, 140, W - 220 - tw(d, lab, 56), 60)
         w = txt(d, (88, ty + 116), v, vs, WHITE, "ls", bold=True)
-        txt(d, (88 + w + 24, ty + 116), fit(d, lab, 56, W - 200 - w)[0], 56, TEAL, "ls")
+        if lab:
+            txt(d, (88 + w + 24, ty + 116), fit(d, lab, 56, W - 200 - w)[0], 56, TEAL, "ls")
         ty += 170
     elif facts:
         cw = (W - 64 - 48) / len(facts)
-        for i, (v, lab) in enumerate(facts):
+        for i, (v, lab, u) in enumerate(facts):
             x = 56 + 24 + i * cw
             if i:
                 d.line((x - 12, ty + 10, x - 12, ty + 170), fill=(60, 66, 68), width=3)
-            v, vs = fit(d, v, 96, cw - 40, 54)
-            txt(d, (x + 16, ty + 96), v, vs, WHITE, "ls", bold=True)
+            value_unit(d, x + 16, ty + 96, v, u, 96, cw - 40, WHITE, GREY)
             txt(d, (x + 16, ty + 160), fit(d, lab, 44, cw - 40)[0], 44, TEAL, "ls")
         ty += 190
     if foot:
@@ -672,23 +703,14 @@ def style_b(st):
     im = Image.new("RGB", (W, H), CREAM)
     d = draw(im)
     big, s1, s2 = st["mast"]
-    bs = 260
-    while bs > 120 and tw(d, big, bs) > 560:
-        bs -= 10
-    txt(d, (56, 300), big, bs, TEAL, "ls", bold=True)
-    x = 56 + tw(d, big, bs) + 34
-    if s1:
-        txt(d, (x, 206), fit(d, s1, 48, W - 60 - x)[0], 48, INK, "ls")
-    txt(d, (x, 278), fit(d, s2, 60, W - 60 - x)[0], 60, INK, "ls", bold=True)
     brand_chip(im, W - 56, 56)
-    d.rectangle((56, 334, W - 56, 340), fill=INK)
     photos = st.get("photos")
     head = st.get("head_b", st.get("head")) or ""
     rows = st.get("rows") or []
     facts = [] if st.get("kind") in ("daily", "weekly") else [f for f in st.get("facts_ab") or st.get("facts") or []
                                                             if f[0]][:3]
     if st.get("kind") == "meal" and st.get("hero"):
-        facts = [(st["hero"][1], "千卡")] + facts[:2]
+        facts = [(st["hero"][1], "热量", "千卡")] + facts[:2]
     foot = st.get("foot")
     week = st.get("week")
     more = st.get("more", 0)
@@ -703,15 +725,17 @@ def style_b(st):
     max_rows = 6
     rows_shown = rows[:max_rows]
     hidden = len(rows) - len(rows_shown) + more
-    rh = 100
+    rh = 92
     fh = 190 if facts else 0
     wh = 150 if week else 0
-    ph = 300 if photos else 0
+    ph = 260 if photos else 0
 
     def total():
         return (quote_h(qs) + (ph + 40 if ph else 0) + (fh + 20 if fh else 0) + (wh if wh else 0)
                 + len(rows_shown) * rh + (rh if hidden else 0) + (8 if rows_shown else 0))
 
+    if total() > bottom - y0 and photos:
+        wh = 0  # with photos, the rows matter more than the week strip
     while total() > bottom - y0 and len(rows_shown) > 1:
         rows_shown = rows_shown[:-1]
         hidden += 1
@@ -727,6 +751,39 @@ def style_b(st):
     if spare < 0 and qs > 72:
         qs -= 8
         spare = bottom - y0 - total()
+    # little data and no photo: the masthead becomes a cover (huge number, title under it)
+    bs, cover = 260, False
+    while bs > 120 and tw(d, big, bs) > 560:
+        bs -= 10
+    if not photos and spare > 300:
+        cover = True
+        grow = min(int(spare * 0.85), 480) if not (head or rows_shown) else min(int(spare * 0.4), 160)
+        bs = 260 + grow
+        while bs > 200 and tw(d, big, bs) > W - 112:
+            bs -= 10
+        mast_h = int(bs * 0.75) + 70 + (70 if s1 else 0) + 90
+        spare -= max(0, mast_h - 230)
+        y0 += max(0, mast_h - 230)
+    alone = cover and not (head or fh or wh or rows_shown or hidden)
+    if alone:  # nothing under the cover: centre it
+        y0 += max(0, spare) // 2
+        spare = 0
+    if cover:
+        top = 150 - d.textbbox((0, 0), big, font=F(bs), anchor="ls")[1] + (y0 - 380 - max(0, int(bs * 0.75) + 70 + (70 if s1 else 0) + 90 - 230) if alone else 0)
+        txt(d, (48, top), big, bs, TEAL, "ls", bold=True)
+        ty = top + 70
+        if s1:
+            txt(d, (56, ty), fit(d, s1, 52, W - 112)[0], 52, INK, "ls")
+            ty += 70
+        txt(d, (56, ty), fit(d, s2, 64, W - 112)[0], 64, INK, "ls", bold=True)
+        d.rectangle((56, ty + 40, W - 56, ty + 46), fill=INK)
+    else:
+        txt(d, (56, 300), big, bs, TEAL, "ls", bold=True)
+        x = 56 + tw(d, big, bs) + 34
+        if s1:
+            txt(d, (x, 206), fit(d, s1, 48, W - 60 - x)[0], 48, INK, "ls")
+        txt(d, (x, 278), fit(d, s2, 60, W - 60 - x)[0], 60, INK, "ls", bold=True)
+        d.rectangle((56, 334, W - 56, 340), fill=INK)
     n_rows = len(rows_shown) + (1 if hidden else 0)
     if spare > 0 and n_rows:
         add = min(spare // n_rows, 110)
@@ -748,12 +805,11 @@ def style_b(st):
     if fh:
         d.line((56, y, W - 56, y), fill=RULE, width=3)
         cw = (W - 112) / len(facts)
-        for i, (v, lab) in enumerate(facts):
+        for i, (v, lab, u) in enumerate(facts):
             x = 56 + i * cw
             if i:
                 d.line((x, y + 30, x, y + fh - 30), fill=RULE, width=3)
-            v, vs = fit(d, v, 76, cw - 48, 50)
-            txt(d, (x + (24 if i else 0), y + 104), v, vs, TEAL, "ls", bold=True)
+            value_unit(d, x + (24 if i else 0), y + 104, v, u, 76, cw - 48, TEAL, INK)
             txt(d, (x + (24 if i else 0), y + 160), fit(d, lab, 40, cw - 48)[0], 40, INK, "ls")
         y += fh
         d.line((56, y, W - 56, y), fill=RULE, width=3)
@@ -854,16 +910,22 @@ def style_c(st):
                 frac = st["kcal"][1] if kind == "daily" and st.get("kcal") else None
                 goal = st["kcal"][2] if kind == "daily" and st.get("kcal") else ""
                 txt(d, (x0 + 40, y + 64), hero[0], 44, GREY, "lm")
-                bs = min(240 if not ring_ else 150, int(h * 0.5))
-                unit_w = tw(d, hero[2], 48) + 20 if hero[2] else 0
+                tall = h > 480 and not ring_  # little data: one big tile, so the number gets big
+                room = h - 110 - (150 if frac is not None else 40) - (110 if tall else 0)
+                bs = min(420 if tall else 240 if not ring_ else 150, int(room / 0.8))
+                unit_w = tw(d, hero[2], 56) + 20 if hero[2] else 0
                 v, bs = fit(d, hero[1], bs, hx1 - x0 - 80 - unit_w, 70)
-                by = y + 110 + bs * 0.78 if frac is not None else y + (h + 70 + bs * 0.72) / 2
+                by = (y + 110 + (room + bs * 0.75) / 2) if frac is not None or not tall else y + (h + bs * 0.72) / 2
+                if not tall and frac is None:
+                    by = y + (h + 70 + bs * 0.72) / 2
                 w = txt(d, (x0 + 36, by), v, bs, WHITE, "ls", bold=True)
                 if hero[2]:
                     txt(d, (x0 + 36 + w + 16, by), hero[2], 48, GREY, "ls")
                 if frac is not None:
                     bar(d, x0 + 40, hx1 - 40, y + h - 112, frac, TEAL, 30)
                     txt(d, (x0 + 40, y + h - 48), goal, 40, (150, 150, 150), "lm")
+                elif tall and st.get("kicker") and kind != "daily":
+                    txt(d, (x0 + 40, y + h - 70), fit(d, st["kicker"], 64, hx1 - x0 - 80)[0], 64, TEAL, "lm", bold=True)
             if ring_:
                 rx0 = split + (G / 2 if hero else 0)
                 tile(d, (rx0, y, x1, y + h))
@@ -888,9 +950,8 @@ def style_c(st):
                     if frac is not None:
                         bar(d, tx0 + 30, tx0 + cw - 30, y + h - 52, frac, BAR_COLORS[i % 3], 24)
                 else:
-                    v, lab = it
-                    v, vs = fit(d, v, 80, cw - 56, 46)
-                    txt(d, (tx0 + 28, y + h / 2 + 14), v, vs, WHITE if i else TEAL, "ls", bold=True)
+                    v, lab, u = it
+                    value_unit(d, tx0 + 28, y + h / 2 + 14, v, u, 80, cw - 56, WHITE if i else TEAL, GREY)
                     txt(d, (tx0 + 30, y + h / 2 + 70), fit(d, lab, 40, cw - 60)[0], 40, GREY, "ls")
         elif name == "list":
             tile(d, b)
