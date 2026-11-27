@@ -334,12 +334,18 @@ def collage(im, box, photos, r=0, gap=10, plus_top=False):
         w, h = c - a, e - b
         piece = cover(img, w, h, focus)
         im.paste(piece, (a, b), round_mask(w, h, r) if r else None)
-    if extra:
+    if extra and plus_top:  # text sits over the bottom of the photo: show "+N" as a pill in the top-right corner
+        d = draw(im)
+        pw = tw(d, "+%d" % extra, 48) + 48
+        bx1, by0 = int(box[2]) - 24, int(box[1]) + 24
+        d.rounded_rectangle((bx1 - pw, by0, bx1, by0 + 76), 38, fill=(0, 0, 0))
+        txt(d, (bx1 - pw / 2, by0 + 38), "+%d" % extra, 48, WHITE, "mm", bold=True)
+    elif extra:
         a, b, c, e = boxes[-1]
         shade = (round_mask(c - a, e - b, r) if r else Image.new("L", (c - a, e - b), 255)).point(lambda v: v * 150 // 255)
         im.paste(Image.new("RGB", (c - a, e - b), (0, 0, 0)), (a, b), shade)
         # "+N" sits high in the tile when text is laid over the bottom of the photo
-        txt(draw(im), ((a + c) / 2, b + 90 if plus_top else (b + e) / 2), "+%d" % extra, 96, WHITE, "mm", bold=True)
+        txt(draw(im), ((a + c) / 2, (b + e) / 2), "+%d" % extra, 96, WHITE, "mm", bold=True)
 
 
 def shade_top(im, h=230, alpha=170):
@@ -1202,16 +1208,16 @@ def style_c(st):
                 tile(d, (tx0, y, tx0 + cw, y + h))
                 if name == "bars":
                     n, v, frac = it
-                    txt(d, (tx0 + 30, y + 56), fit(d, n, 40, cw - 60)[0], 40, GREY, "lm")
-                    v, vs = fit(d, v, 64 if h < 220 else 76, cw - 60, 46)
+                    txt(d, (tx0 + 30, y + (44 if h < 220 else 56)), fit(d, n, 40, cw - 60)[0], 40, GREY, "lm")
+                    v, vs = fit(d, v, (56 if frac is not None else 64) if h < 220 else 76, cw - 60, 40)
                     if h < 220:
-                        vb = y + h - (66 if frac is not None else 34)
+                        vb = y + h - (52 if frac is not None else 34)
                     else:
                         vb = y + 56 + (h - 56) * 0.55
                     txt(d, (tx0 + 28, vb), v, vs, WHITE, "ls", bold=True)
                     if frac is not None:
-                        bar(d, tx0 + 30, tx0 + cw - 30, y + h - (40 if h < 220 else 52), frac, BAR_COLORS[i % 3],
-                            20 if h < 220 else 24)
+                        bar(d, tx0 + 30, tx0 + cw - 30, y + h - (34 if h < 220 else 52), frac, BAR_COLORS[i % 3],
+                            18 if h < 220 else 24)
                 else:
                     v, lab, u = it
                     value_unit(d, tx0 + 28, y + h / 2 + 14, v, u, 80, cw - 56, WHITE if i else TEAL, GREY)
