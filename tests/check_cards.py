@@ -41,6 +41,10 @@ def cases(tmp):
                                         "targets": {"protein": 90}, "line": long_text}
     yield "meal-portion-wide", "meal", {"label": "下午茶 · 轻松时刻", "dishes": "方形慕斯蛋糕、3小块", "kcal": "1200-1500",
                                         "macros": {"protein": "45-60", "carb": "150-180", "fat": "40-55"}}
+    yield "meal-menu-white-photo", "meal", {"photo": photo(tmp, (250, 250, 246)), "label": "早餐 · 在家",
+                                            "dishes": "燕麦酸奶杯 1杯 · 水煮蛋 2个 · 蓝莓 一小把 · 黑咖啡",
+                                            "kcal": "380-460", "macros": {"protein": "22-28", "carb": "45-55", "fat": "12-16"},
+                                            "line": "早上吃得很干净"}
     yield "meal-minimal", "meal", {"photo": p[1], "kcal": "300 大卡"}
     yield "meal-photo-only-3", "meal", {"photos": p[:3]}
     yield "workout-normal", "workout", {"sport": "strength", "label": "力量 · 腿日", "line": "深蹲又多了 5kg，\n腿在变强。",
