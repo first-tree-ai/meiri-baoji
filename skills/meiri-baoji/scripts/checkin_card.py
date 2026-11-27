@@ -835,7 +835,6 @@ def style_a(st):
         ty += 54
     if items and facts:
         ty += 4
-        d.line((80, ty, W - 80, ty), fill=(60, 66, 68), width=3)
         ty += 20
     if len(facts) == 1:
         v, lab, u = facts[0]
@@ -851,15 +850,11 @@ def style_a(st):
         facts, vs = fact_row(d, facts, 80 if small else 96, cw - 40, 40 if small else 44)
         for i, (v, lab, u) in enumerate(facts):
             x = 56 + 24 + i * cw
-            if i:
-                d.line((x - 12, ty + 10, x - 12, ty + 170), fill=(60, 66, 68), width=3)
             value_unit(d, x + 16, ty + (80 if small else 96), v, u, vs, cw - 40, WHITE, GREY, vs)
             txt(d, (x + 16, ty + (134 if small else 160)), fit(d, lab, 40 if small else 44, cw - 40)[0],
                 40 if small else 44, TEAL, "ls")
         ty += fact_h
     if foot:
-        if facts:
-            d.line((80, ty, W - 80, ty), fill=(60, 66, 68), width=3)
         t = "%s · %s" % foot
         txt(d, (88, ty + 56), fit(d, t, 46, W - 176)[0], 46, (232, 232, 232), "lm")
     return im
@@ -868,29 +863,23 @@ def style_a(st):
 # ---------- style B: magazine page on cream ----------
 
 def b_list(d, x0, x1, y, rows, two_col, rh):
-    """Numbered list; names-only lists of 4+ go in two columns."""
+    """List without numbers or rules (spacing separates the rows); names-only lists of 4+ go in two columns."""
     if two_col:
         cw = (x1 - x0) / 2
         for i, (k, _) in enumerate(rows):
             r, c = i // 2, i % 2
             cy = y + r * rh + rh / 2
             x = x0 + c * cw
-            txt(d, (x, cy), "%02d" % (i + 1), 38, TEAL, "lm", bold=True)
-            txt(d, (x + 70, cy), fit(d, k, 42, cw - 90)[0], 42, INK, "lm", bold=True)
-        for r in range((len(rows) + 1) // 2 + 1):
-            d.line((x0, y + r * rh, x1, y + r * rh), fill=RULE, width=2)
+            txt(d, (x, cy), fit(d, k, 42, cw - 24)[0], 42, INK, "lm", bold=True)
         return y + ((len(rows) + 1) // 2) * rh
     for i, (k, v) in enumerate(rows):
         cy = y + i * rh + rh / 2
-        d.line((x0, y + i * rh, x1, y + i * rh), fill=RULE, width=2)
-        txt(d, (x0, cy), "%02d" % (i + 1), 38, TEAL, "lm", bold=True)
         vw = 0
         if v:
             vt = fit(d, v, 40, (x1 - x0) * 0.42)[0]
             txt(d, (x1, cy), vt, 40, TEAL, "rm")
             vw = tw(d, vt, 40) + 24
-        txt(d, (x0 + 70, cy), fit(d, k, 42, x1 - x0 - 70 - vw)[0], 42, INK, "lm", bold=True)
-    d.line((x0, y + len(rows) * rh, x1, y + len(rows) * rh), fill=RULE, width=2)
+        txt(d, (x0, cy), fit(d, k, 42, x1 - x0 - vw)[0], 42, INK, "lm", bold=True)
     return y + len(rows) * rh
 
 
@@ -907,13 +896,16 @@ def style_b_photo(st):
     w = txt(d, (56, 150), big, bs, TEAL, "ls", bold=True)
     tail = " · ".join(x for x in (s1, s2) if x)
     txt(d, (56 + w + 24, 150), fit(d, tail, 44, W - 112 - w - 24)[0], 44, INK, "ls")
-    d.rectangle((56, 176, W - 56, 180), fill=INK)
+    d.rectangle((56, 177, W - 56, 179), fill=INK)
     photos, head, foot, week = st["photos"], st.get("head") or "", st.get("foot"), st.get("week")
     rows, more = st.get("rows") or [], st.get("more", 0)
     facts = [] if st.get("kind") in ("daily", "weekly") else [f for f in st.get("facts_ab") or st.get("facts") or []
                                                             if f[0]][:3]
     if st.get("kind") == "meal" and st.get("hero"):
         facts = [(st["hero"][1], "热量", "千卡")] + facts[:2]
+    dish_lines = []
+    if st.get("kind") == "meal":  # what was eaten sits on its photo, above the sentence
+        dish_lines, rows = item_lines(d, st.get("sub") or "", 42, W - 200, 2) if st.get("sub") else [], []
     shown_rows = rows[:6]
     hidden = len(rows) - len(shown_rows) + more
     if hidden:
@@ -938,7 +930,7 @@ def style_b_photo(st):
     collage(im, (56, y, W - 56, y + p), photos, r=10, gap=12, plus_top=True)
     # the sentence (and, if needed, the numbers) sit on the darkened bottom of the photo
     hl = lines_of(d, head, 52, W - 200, 2) if head else []
-    over = len(hl) * 70 + (150 if facts_on_photo else 0)
+    over = len(dish_lines) * 58 + (12 if dish_lines else 0) + len(hl) * 70 + (150 if facts_on_photo else 0)
     if over:
         sh = over + 120
         g = Image.new("L", (1, sh))
@@ -951,6 +943,10 @@ def style_b_photo(st):
 
         im.paste(Image.new("RGB", (W - 112, sh), (0, 0, 0)), (56, int(y + p - sh)), ImageChops.multiply(mask, rm))
         ty = y + p - over - 20
+        for line in dish_lines:
+            txt(d, (96, ty + 29), line, 42, (236, 236, 236), "lm")
+            ty += 58
+        ty += 12 if dish_lines else 0
         for line in hl:
             txt(d, (96, ty + 35), line, 52, WHITE, "lm", bold=True)
             ty += 70
@@ -963,13 +959,10 @@ def style_b_photo(st):
                 txt(d, (x, ty + 126), fit(d, lab, 38, cw - 24)[0], 38, (210, 210, 210), "ls")
     y += p + 20
     if fh:
-        d.line((56, y, W - 56, y), fill=RULE, width=3)
         cw = (W - 112) / len(facts)
         facts, vs = fact_row(d, facts, 64, cw - 48, 38)
         for i, (v, lab, u) in enumerate(facts):
             x = 56 + i * cw
-            if i:
-                d.line((x, y + 24, x, y + fh - 24), fill=RULE, width=3)
             value_unit(d, x + (24 if i else 0), y + 80, v, u, vs, cw - 48, TEAL, INK, vs)
             txt(d, (x + (24 if i else 0), y + 130), fit(d, lab, 38, cw - 48)[0], 38, INK, "ls")
         y += fh + 20
@@ -1064,14 +1057,14 @@ def style_b(st):
             txt(d, (56, ty), fit(d, s1, 52, W - 112)[0], 52, INK, "ls")
             ty += 70
         txt(d, (56, ty), fit(d, s2, 64, W - 112)[0], 64, INK, "ls", bold=True)
-        d.rectangle((56, ty + 40, W - 56, ty + 46), fill=INK)
+        d.rectangle((56, ty + 42, W - 56, ty + 44), fill=INK)
     else:
         txt(d, (56, 300), big, bs, TEAL, "ls", bold=True)
         x = 56 + tw(d, big, bs) + 34
         if s1:
             txt(d, (x, 206), fit(d, s1, 48, W - 60 - x)[0], 48, INK, "ls")
         txt(d, (x, 278), fit(d, s2, 60, W - 60 - x)[0], 60, INK, "ls", bold=True)
-        d.rectangle((56, 334, W - 56, 340), fill=INK)
+        d.rectangle((56, 336, W - 56, 338), fill=INK)
     n_rows = len(rows_shown) + (1 if hidden else 0)
     if spare > 0 and n_rows:
         add = min(spare // n_rows, 110)
@@ -1091,40 +1084,31 @@ def style_b(st):
         collage(im, (56, y, W - 56, y + ph), photos, r=10, gap=12)
         y += ph + 40 + pad
     if fh:
-        d.line((56, y, W - 56, y), fill=RULE, width=3)
         cw = (W - 112) / len(facts)
         facts, vs = fact_row(d, facts, 76, cw - 48, 40)
         for i, (v, lab, u) in enumerate(facts):
             x = 56 + i * cw
-            if i:
-                d.line((x, y + 30, x, y + fh - 30), fill=RULE, width=3)
             value_unit(d, x + (24 if i else 0), y + 104, v, u, vs, cw - 48, TEAL, INK, vs)
             txt(d, (x + (24 if i else 0), y + 160), fit(d, lab, 40, cw - 48)[0], 40, INK, "ls")
         y += fh
-        d.line((56, y, W - 56, y), fill=RULE, width=3)
         y += 20 + pad
     if wh:
         week_dots(d, 56, W - 56, y + wh / 2, week.get("done"), TEAL, RULE, INK, (120, 116, 110), r=44)
         y += wh + pad
     big_rows = rh >= 150
     for i, (k, v) in enumerate(rows_shown):
-        d.line((56, y, W - 56, y), fill=RULE, width=3)
         cy = y + rh / 2
-        txt(d, (56, cy), "%02d" % (i + 1), 44, TEAL, "lm", bold=True)
         size = 60 if big_rows else 48
         if v:
-            kw = txt(d, (150, cy), fit(d, k, size, 300)[0], size, INK, "lm", bold=True)
-            vt, vs = fit(d, v, 60 if big_rows else 44, W - 56 - (150 + kw + 32), MIN_PX)
-            txt(d, (150 + kw + 32, cy), vt, vs, TEAL if big_rows else INK, "lm", bold=big_rows)
+            kw = txt(d, (56, cy), fit(d, k, size, 400)[0], size, INK, "lm", bold=True)
+            vt, vs = fit(d, v, 60 if big_rows else 44, W - 56 - (56 + kw + 32), MIN_PX)
+            txt(d, (56 + kw + 32, cy), vt, vs, TEAL if big_rows else INK, "lm", bold=big_rows)
         else:
-            txt(d, (150, cy), fit(d, k, size, W - 220)[0], size, INK, "lm", bold=True)
+            txt(d, (56, cy), fit(d, k, size, W - 112)[0], size, INK, "lm", bold=True)
         y += rh
     if hidden:
-        d.line((56, y, W - 56, y), fill=RULE, width=3)
-        txt(d, (150, y + rh / 2), "还有 %d 项" % hidden, 44, (120, 116, 110), "lm")
+        txt(d, (56, y + rh / 2), "还有 %d 项" % hidden, 44, (120, 116, 110), "lm")
         y += rh
-    if rows_shown:
-        d.line((56, y, W - 56, y), fill=RULE, width=3)
     if foot:
         d.rectangle((0, H - 150, W, H), fill=INK)
         t = "%s → %s" % foot
@@ -1276,8 +1260,6 @@ def style_c(st):
             big_list = step > 120
             for i, (k, v) in enumerate(lst[:n]):
                 cy = y + 20 + step * (i + 0.5)
-                if i:
-                    d.line((x0 + 36, cy - step / 2, x1 - 36, cy - step / 2), fill=(52, 54, 56), width=2)
                 if big_list and kind == "daily":
                     cx = x0 + 80
                     d.rounded_rectangle((cx - 44, cy - 14, cx - 28, cy + 14), 5, fill=TEAL)
