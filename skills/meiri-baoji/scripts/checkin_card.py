@@ -912,7 +912,7 @@ def weekly(spec):
     """Week summary (dark): training days as the hero, up to three week totals, the best moment, next week's one thing."""
     global T
     T = THEMES["dark"]
-    days = spec.get("days") or []
+    days = [x if isinstance(x, dict) else {} for x in spec.get("days") or []]
     if not days and not spec.get("stats"):
         sys.exit("NOT_ENOUGH_DATA: weekly needs days or stats; reply in text instead")
     im = Image.new("RGB", (W, H), T["bg"])
@@ -941,7 +941,7 @@ def weekly_bars(spec):
     """Week summary (light): one bar per day (score, or calories when there is no score), the best moment, next week."""
     global T
     T = THEMES["light"]
-    days = spec.get("days") or []
+    days = [x if isinstance(x, dict) else {} for x in spec.get("days") or []]
     vals = [number(x.get("score")) if x.get("score") is not None else number(x.get("kcal")) for x in days][:7]
     if sum(1 for v in vals if v) < 2:
         sys.exit("NOT_ENOUGH_DATA: weekly-bars needs scores or calories on at least 2 days; use weekly")
