@@ -88,7 +88,7 @@ SKILL.md「能帮你做的事」表里每一项的细节都在这里：什么时
 - **营养卡（没有照片的一餐）：** `python3 scripts/nutrition_card.py <输出.png> <spec.json>`（spec 也可以从标准输入传）。spec 写餐次、热量、蛋白、碳水、脂肪、纤维（都用范围，如 `"30-40"`）和一句最值得做的建议。卡上不写分数，不给食物贴好坏标签；出现进食障碍迹象时不做营养卡。
 - **计划图：** `python3 scripts/plan_card.py <输出.png> <spec.json>`。spec 按这位用户自己的计划写：标题、一周安排、每次训练的动作和组数、加量要点、脚注（参考计划，不是医疗处方）。不要照搬别人的计划或身体数据。饮食计划也可以用它（`kind` 用 `meal`）。
 - 脚本在本 Skill 目录的 `scripts/` 下（营养卡和计划图的 spec 格式写在脚本开头）。生成的图片放在工作目录的临时文件夹，发完可以删；不要写进 Skill 目录。
-- 品牌字体 `assets/xiaota-wordmark.ttf` 只含“小塔”两个字的子集，按 SIL Open Font License 使用（`assets/xiaota-wordmark-OFL.txt`）；占位图来源和授权见 `assets/placeholders/CREDITS.txt`。这些文件不要改动或删掉。
+- 品牌字体 `assets/xiaota-wordmark.ttf` 只含“小塔”两个字的子集，按 SIL Open Font License 使用（`assets/xiaota-wordmark-OFL.txt`）。这些文件不要改动或删掉。
 - 需要 Python 3 和 Pillow，以及一个中文字体。脚本报缺 Pillow 时先 `python3 -m pip install --user pillow` 再试；报找不到中文字体时用文字回复，不要硬发乱码图。
 
 ## 陪伴方式
